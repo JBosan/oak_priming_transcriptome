@@ -1,0 +1,82 @@
+---
+title: "priming_selection_venns"
+output: word_document
+date: "2024-07-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()) #set working directory to rproject root
+```
+
+# Load Packages
+```{r}
+library("VennDiagram") #for venn diagrams
+```
+
+# Load data
+
+Note this data contains:
+
+- Significant DEGs for mock and PM-infected plants at 1 and 2 dpi for each elicitor
+- All primed genes for each elicitor at 1 and 2 dpi
+
+```{r}
+load(file = "Deseq_analysis/priming_selection_venns.RData")
+```
+
+# Selecting primed genes 
+
+Note these venn diagrams are for illustrative purposes 
+(selection of primed genes already done in Deseq-analysis files)
+
+### 1 dpi
+```{r}
+#set up pdf to save graphs
+venns <- "Deseq_analysis/one_dpi_out/primed_venns_1dpi.pdf"
+pdf(file = venns, width = 12, height = 12)
+
+#colours based on figure 5 = Extraction of primed differentially expressed genes (DEGs). 
+#"#9498F8" = mock
+#"#F19B98" = PM 
+
+vennPlot <- venn.diagram(list(row.names(sig_DEGs_1dpi_mock_BABA_vs_mock_Water), row.names(sig_DEGs_1dpi_PM_BABA_vs_PM_Water)), filename = NULL, fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=5, category.names = c(" "," "), main = "BABA primed DEGs 1dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.1, ext.pos = c(188,0), ext.length = 0.7, ext.dist = c(-0.05,0.05), disable.logging = FALSE)
+grid.newpage()
+grid.draw(vennPlot)
+
+vennPlot <- venn.diagram(list(row.names(sig_DEGs_1dpi_mock_SA_vs_mock_Water), row.names(sig_DEGs_1dpi_PM_SA_vs_PM_Water)), filename = NULL, fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=5, category.names = c(" "," "), main = "SA primed DEGs 1dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.1, ext.pos = 10, ext.length = 0.7, ext.dist = -0.15, disable.logging = FALSE)
+grid.newpage()
+grid.draw(vennPlot)
+
+vennPlot <- venn.diagram(list(row.names(sig_DEGs_1dpi_mock_JA_vs_mock_Water), row.names(sig_DEGs_1dpi_PM_JA_vs_PM_Water)), filename = NULL, fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=5, category.names = c(" "," "), main = "JA primed DEGs 1dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.1, ext.pos = 10, ext.length = 0.7, ext.dist = -0.1, disable.logging = FALSE)
+grid.newpage()
+grid.draw(vennPlot)
+
+dev.off()
+```
+
+### 2 dpi
+```{r}
+#set up pdf to save graphs
+venns <- "Deseq_analysis/two_dpi_out/primed_venns_2dpi.pdf"
+pdf(file = venns, width = 12, height = 12)
+
+#colours based on figure 5 = Extraction of primed differentially expressed genes (DEGs). 
+#"#9498F8" = mock
+#"#F19B98" = PM 
+
+vennPlot <- venn.diagram(list(row.names(sig_DEGs_2dpi_mock_BABA_vs_mock_Water), row.names(sig_DEGs_2dpi_PM_BABA_vs_PM_Water)), filename = NULL, fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=5, category.names = c(" "," "), main = "BABA primed DEGs 2dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.15, ext.pos = 10, ext.length = 0.7, ext.dist = -0.1, disable.logging = FALSE)
+grid.newpage()
+grid.draw(vennPlot)
+
+vennPlot <- venn.diagram(list(row.names(sig_DEGs_2dpi_mock_SA_vs_mock_Water), row.names(sig_DEGs_2dpi_PM_SA_vs_PM_Water)), filename = NULL, fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=5, category.names = c(" "," "), main = "SA primed DEGs 2dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.15, ext.pos = 10, ext.length = 0.7, ext.dist = -0.1, disable.logging = FALSE)
+grid.newpage()
+grid.draw(vennPlot)
+
+vennPlot <- venn.diagram(list(row.names(sig_DEGs_2dpi_mock_JA_vs_mock_Water), row.names(sig_DEGs_2dpi_PM_JA_vs_PM_Water)), filename = NULL, fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=5, category.names = c(" "," "), main = "JA primed DEGs 2dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.15, ext.pos = 10, ext.length = 0.7, ext.dist = -0.1, disable.logging = FALSE)
+grid.newpage()
+grid.draw(vennPlot)
+
+dev.off()
+```
