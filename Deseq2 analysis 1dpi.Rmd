@@ -1,0 +1,1094 @@
+---
+title: "Deseq2 analysis 1dpi"
+output:
+  word_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()) #set working directory to rproject root
+```
+
+#LOAD PACKKAGES
+```{r warning=FALSE, message=FALSE}
+library('BiocManager') #for installing bioconductor packages like DESeq2
+library('DESeq2') #for analyzing differential gene expression
+library("mixOmics") #for PCA and PLSDA
+library('ggplot2') #for plotting
+library("VennDiagram") #for venn diagrams
+library("ComplexHeatmap") #for heatmaps
+library("viridis") #for gene clustering heatmap colours
+library('RColorBrewer') #for sample-sample heatmap colours
+library('dendextend') #for editing dendrograms in gene clustering heatmap
+library("dplyr") #for data manipulation
+library('caret') #for removing zero variance data for PCA/PLSDA
+```
+
+#LOAD 1DPI DATA
+```{r warning=FALSE}
+#Think the way to do DESeq analysis/venn-diagrams is to split into two "experiments" and then compare the two to select primed metabolites
+#For PCA and PLS-DA do single experiment (i.e., mock + PM combined) as need to compare all_1dpi treatments 
+
+#MOCK
+
+#read in sample info file
+mock_one_dpi_sample_info <- read.table("raw_count/1dpi/mock_sample_info_1dpi.csv", header = TRUE, sep = ",")
+
+#add rownames to sample info = for labelling of plots (e.g., heatmaps)
+row.names(mock_one_dpi_sample_info) <- mock_one_dpi_sample_info$sample_name
+
+#create factors for condition column so that water will be used as intercept/base-line/reference for the model
+mock_one_dpi_sample_info$condition <- factor(mock_one_dpi_sample_info$condition, levels = c("Mock_Water", "Mock_BABA", "Mock_JA", "Mock_SA"))
+
+#visualize the model matrix that will be used by Deseq2
+model.matrix(~condition, data = mock_one_dpi_sample_info)
+#should display 4 columns - intercept (MW), MB, MJA, MSA
+
+#read in gene counts data
+mock_one_dpi_raw_gene_data <- DESeqDataSetFromHTSeqCount(
+  sampleTable = mock_one_dpi_sample_info, directory = 'raw_count/1dpi',
+  design = ~condition)
+
+#PM
+
+#read in sample info file
+PM_one_dpi_sample_info <- read.table("raw_count/1dpi/PM_sample_info_1dpi.csv", header = TRUE, sep = ",")
+
+#add rownames to sample info = for labelling of plots (e.g., heatmaps)
+row.names(PM_one_dpi_sample_info) <- PM_one_dpi_sample_info$sample_name
+
+#create factors for condition column so that water will be used as intercept/base-line/reference for the model
+PM_one_dpi_sample_info$condition <- factor(PM_one_dpi_sample_info$condition, levels = c("PM_Water", "PM_BABA", "PM_JA", "PM_SA"))
+
+#visualize the model matrix that will be used by Deseq2
+model.matrix(~condition, data = PM_one_dpi_sample_info)
+#should display 4 columns - intercept (MW), MB, MJA, MSA
+
+#read in gene counts data
+PM_one_dpi_raw_gene_data <- DESeqDataSetFromHTSeqCount(
+  sampleTable = PM_one_dpi_sample_info, directory = 'raw_count/1dpi',
+  design = ~condition)
+
+#ALL DATA (MOCK + PM) 
+
+#read in sample info file
+all_one_dpi_sample_info <- read.table("raw_count/1dpi/sample_info_1dpi.csv", header = TRUE, sep = ",")
+
+#add rownames to sample info = for labelling of plots (e.g., heatmaps)
+row.names(all_one_dpi_sample_info) <- all_one_dpi_sample_info$Samplename
+
+#create factors for elicitor column so that water will be used as intercept/base-line
+all_one_dpi_sample_info$condition <- factor(all_one_dpi_sample_info$condition, levels = c("Mock_Water", "Mock_BABA", "Mock_JA", "Mock_SA", "PM_Water", "PM_BABA", "PM_JA", "PM_SA"))
+
+#visualize the model matrix that will be used by Deseq2
+model.matrix(~condition, data = all_one_dpi_sample_info)
+
+#read in gene counts data
+all_one_dpi_raw_gene_data <- DESeqDataSetFromHTSeqCount(
+  sampleTable = all_one_dpi_sample_info, directory ='raw_count/1dpi',
+  design = ~condition)
+
+```
+
+#MOCK QUALITY SCATTERPLOTS
+```{r}
+#extract and save normalised counts
+mock_one_dpi_raw_gene_data <- estimateSizeFactors(mock_one_dpi_raw_gene_data)
+mock_one_dpi_normalised_raw_gene_data <- counts(mock_one_dpi_raw_gene_data, normalized=TRUE)
+
+#set up pdf to save graphs
+quality_scatterplots <- "Deseq_analysis/one_dpi_out/mock_one_dpi_quality_scatterplots.pdf"
+pdf(file = quality_scatterplots)
+
+#mock water
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,1]), log(mock_one_dpi_normalised_raw_gene_data[,2]), xlab = "1MW_1", ylab = "1MW_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,1]), log(mock_one_dpi_normalised_raw_gene_data[,3]), xlab = "1MW_1", ylab = "1MW_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,1]), log(mock_one_dpi_normalised_raw_gene_data[,4]), xlab = "1MW_1", ylab = "1MW_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,2]), log(mock_one_dpi_normalised_raw_gene_data[,3]), xlab = "1MW_2", ylab = "1MW_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,2]), log(mock_one_dpi_normalised_raw_gene_data[,4]), xlab = "1MW_2", ylab = "1MW_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,3]), log(mock_one_dpi_normalised_raw_gene_data[,4]), xlab = "1MW_3", ylab = "1MW_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+#mock BABA
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,5]), log(mock_one_dpi_normalised_raw_gene_data[,6]), xlab = "1MB_1", ylab = "1MB_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,5]), log(mock_one_dpi_normalised_raw_gene_data[,7]), xlab = "1MB_1", ylab = "1MB_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,5]), log(mock_one_dpi_normalised_raw_gene_data[,8]), xlab = "1MB_1", ylab = "1MB_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,6]), log(mock_one_dpi_normalised_raw_gene_data[,7]), xlab = "1MB_2", ylab = "1MB_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,6]), log(mock_one_dpi_normalised_raw_gene_data[,8]), xlab = "1MB_2", ylab = "1MB_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,7]), log(mock_one_dpi_normalised_raw_gene_data[,8]), xlab = "1MB_3", ylab = "1MB_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+#mock JA
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,9]), log(mock_one_dpi_normalised_raw_gene_data[,10]), xlab = "1MJ_1", ylab = "1MJ_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,9]), log(mock_one_dpi_normalised_raw_gene_data[,11]), xlab = "1MJ_1", ylab = "1MJ_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,9]), log(mock_one_dpi_normalised_raw_gene_data[,12]), xlab = "1MJ_1", ylab = "1MJ_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,10]), log(mock_one_dpi_normalised_raw_gene_data[,11]), xlab = "1MJ_2", ylab = "1MJ_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,10]), log(mock_one_dpi_normalised_raw_gene_data[,12]), xlab = "1MJ_2", ylab = "1MJ_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,11]), log(mock_one_dpi_normalised_raw_gene_data[,12]), xlab = "1MJ_3", ylab = "1MJ_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+#mock SA
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,13]), log(mock_one_dpi_normalised_raw_gene_data[,14]), xlab = "1MS_1", ylab = "1MS_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,13]), log(mock_one_dpi_normalised_raw_gene_data[,15]), xlab = "1MS_1", ylab = "1MS_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,13]), log(mock_one_dpi_normalised_raw_gene_data[,16]), xlab = "1MS_1", ylab = "1MS_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,14]), log(mock_one_dpi_normalised_raw_gene_data[,15]), xlab = "1MS_2", ylab = "1MS_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,14]), log(mock_one_dpi_normalised_raw_gene_data[,16]), xlab = "1MS_2", ylab = "1MS_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(mock_one_dpi_normalised_raw_gene_data[,15]), log(mock_one_dpi_normalised_raw_gene_data[,16]), xlab = "1MS_3", ylab = "1MS_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+dev.off()
+```
+
+#PM QUALITY SCATTERPLOTS
+```{r}
+#extract and save normalised counts
+PM_one_dpi_raw_gene_data <- estimateSizeFactors(PM_one_dpi_raw_gene_data)
+PM_one_dpi_normalised_raw_gene_data <- counts(PM_one_dpi_raw_gene_data, normalized=TRUE)
+
+#set up pdf to save graphs
+quality_scatterplots <-"Deseq_analysis/one_dpi_out/PM_one_dpi_quality_scatterplots.pdf"
+pdf(file = quality_scatterplots)
+
+#PM water
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,1]), log(PM_one_dpi_normalised_raw_gene_data[,2]), xlab = "1PMW_1", ylab = "1PMW_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,1]), log(PM_one_dpi_normalised_raw_gene_data[,3]), xlab = "1PMW_1", ylab = "1PMW_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,1]), log(PM_one_dpi_normalised_raw_gene_data[,4]), xlab = "1PMW_1", ylab = "1PMW_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,2]), log(PM_one_dpi_normalised_raw_gene_data[,3]), xlab = "1PMW_2", ylab = "1PMW_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,2]), log(PM_one_dpi_normalised_raw_gene_data[,4]), xlab = "1PMW_2", ylab = "1PMW_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,3]), log(PM_one_dpi_normalised_raw_gene_data[,4]), xlab = "1PMW_3", ylab = "1PMW_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+#PM BABA
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,5]), log(PM_one_dpi_normalised_raw_gene_data[,6]), xlab = "1PMB_1", ylab = "1PMB_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,5]), log(PM_one_dpi_normalised_raw_gene_data[,7]), xlab = "1PMB_1", ylab = "1PMB_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,5]), log(PM_one_dpi_normalised_raw_gene_data[,8]), xlab = "1PMB_1", ylab = "1PMB_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,6]), log(PM_one_dpi_normalised_raw_gene_data[,7]), xlab = "1PMB_2", ylab = "1PMB_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,6]), log(PM_one_dpi_normalised_raw_gene_data[,8]), xlab = "1PMB_2", ylab = "1PMB_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,7]), log(PM_one_dpi_normalised_raw_gene_data[,8]), xlab = "1PMB_3", ylab = "1PMB_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+#PM JA
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,9]), log(PM_one_dpi_normalised_raw_gene_data[,10]), xlab = "1PMJ_1", ylab = "1PMJ_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,9]), log(PM_one_dpi_normalised_raw_gene_data[,11]), xlab = "1PMJ_1", ylab = "1PMJ_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,9]), log(PM_one_dpi_normalised_raw_gene_data[,12]), xlab = "1PMJ_1", ylab = "1PMJ_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,10]), log(PM_one_dpi_normalised_raw_gene_data[,11]), xlab = "1PMJ_2", ylab = "1PMJ_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "D")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,10]), log(PM_one_dpi_normalised_raw_gene_data[,12]), xlab = "1PMJ_2", ylab = "1PMJ_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "E")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,11]), log(PM_one_dpi_normalised_raw_gene_data[,12]), xlab = "1PMJ_3", ylab = "1PMJ_4")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "F")
+
+#PM SA
+par(mfrow = c(2,3)) #2 rows, 3 cols
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,13]), log(PM_one_dpi_normalised_raw_gene_data[,14]), xlab = "1PMS_1", ylab = "1PMS_2")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "A")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,13]), log(PM_one_dpi_normalised_raw_gene_data[,15]), xlab = "1PMS_1", ylab = "1PMS_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "B")
+
+plot(log(PM_one_dpi_normalised_raw_gene_data[,14]), log(PM_one_dpi_normalised_raw_gene_data[,15]), xlab = "1PMS_2", ylab = "1PMS_3")
+
+abline(a = 0, b = 1, col = "red")
+
+title(main = "C")
+
+dev.off()
+```
+
+#TRANSFORMATION
+```{r}
+rlog_all_one_dpi_raw_gene_data <- rlog(all_one_dpi_raw_gene_data) 
+```
+
+#SAMPLE-SAMPLE DISTANCE HEATMAP
+```{r}
+#Basically shows how similar the different samples are, uses normalised data
+
+#set up pdf to save graphs
+sample_clustering_dend <- "Deseq_analysis/one_dpi_out/one_dpi_sample_clustering_dend.pdf"
+pdf(file = sample_clustering_dend, width = 10, height = 5)
+
+#first generate sample-sample distance matrix
+sampleDistances <- dist(t(assay(rlog_all_one_dpi_raw_gene_data)))
+sampleDistMatrix <- as.matrix(sampleDistances)
+colnames(sampleDistMatrix) <- rownames(all_one_dpi_sample_info)
+
+#perform hierachical clustering and plot dendrogram
+col = c("blue", "#AA4499", "#AA4499", "#117733", "#44AA99", "#44AA99", "#DDCC77", "#33bbee", "#33bbee", "#33bbee", "#33bbee", "#999933", "#999933", "#999933", "blue", "blue", "blue", "#117733", "#117733",  "#AA4499", "#AA4499", "#DDCC77", "#DDCC77", "#DDCC77", "#44AA99", "#44AA99", "#117733", "#882255", "#882255", "#882255", "#882255") #set up sample colours
+one_dpi_sample_dendrogram <- as.dendrogram(hclust(sampleDistances)) #cluster
+dend <- dendextend::set(one_dpi_sample_dendrogram, "labels_colors", col) #color code labels
+plot(dend) #plot 
+dendextend::rect.dendrogram(dend, h = 95, border = "red", lty = "dashed") #add dashed red rectangles around clusters (visually a cut height of 95 ok)
+
+dev.off()
+
+#set up pdf to save graphs
+sample_clustering <- "Deseq_analysis/one_dpi_out/one_dpi_sample_clustering.pdf"
+pdf(file = sample_clustering, width = 15, height = 15)
+
+#create colour scheme
+colours <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+
+#set up sample annotations for plot
+sample_annotations <- all_one_dpi_sample_info[,3]
+
+treatments_top <- HeatmapAnnotation(Condition = sample_annotations, 
+                                    col = list(Condition = c("Mock_Water" = "blue", "Mock_BABA" = "#117733", "Mock_JA" = "#AA4499", "Mock_SA" = "#DDCC77",
+                                                               "PM_Water" = "#33bbee", "PM_BABA" = "#44AA99", "PM_JA" =  "#882255", "PM_SA" = "#999933")), 
+                                    show_annotation_name = F, gp = gpar(col = "black"))
+
+treatments_left <- rowAnnotation(Condition = sample_annotations, 
+                                 col = list(Condition = c("Mock_Water" = "blue", "Mock_BABA" = "#117733", "Mock_JA" = "#AA4499", "Mock_SA" = "#DDCC77", 
+                                                          "PM_Water" = "#33bbee", "PM_BABA" = "#44AA99", "PM_JA" =  "#882255", "PM_SA" = "#999933")),
+                                 show_legend = F, show_annotation_name = F, gp = gpar(col = "black"))
+
+ComplexHeatmap::Heatmap(sampleDistMatrix, clustering_distance_rows = sampleDistances, clustering_distance_columns = sampleDistances,
+                        col = colours, top_annotation = treatments_top, left_annotation = treatments_left,
+                        heatmap_legend_param = list(title = NULL, border = "black"),
+                        show_row_names = F, show_column_names = F, column_title = "1dpi Sample Clustering Heatmap")
+
+dev.off()
+```
+
+
+#SET UP PCA AND PLSDA 
+```{r}
+#extract rlog expression data (unsure if use rlog expression or normal expression)
+rlog_expression_all_one_dpi <- t(assay(rlog_all_one_dpi_raw_gene_data))
+dim(rlog_expression_all_one_dpi) #check dimensions of resulting matrix
+
+#need to remove colums with all 0s/zero variance as otherwise PLS/PCA will throw error: columns with zero variance in 'X'
+all_cols <- colnames(rlog_expression_all_one_dpi) #identify names of all cols 
+remove_cols <- caret::nearZeroVar(rlog_expression_all_one_dpi, names = TRUE) #identify cols with zero var to remove 
+rlog_expression_all_one_dpi <- rlog_expression_all_one_dpi[ , setdiff(all_cols, remove_cols)] #remove cols with zero var 
+dim(rlog_expression_all_one_dpi) #check dimensions of resulting matrix, should be smaller
+
+#extract classes (conditions)
+rlog_classes_all_one_dpi <- colData(rlog_all_one_dpi_raw_gene_data)
+rlog_classes_all_one_dpi <- rlog_classes_all_one_dpi$condition
+
+#check that all conditions extracted as expected
+summary(rlog_classes_all_one_dpi)
+```
+
+#PCA SCORES
+```{r}
+#create PCA model
+pca_one_dpi <- pca(rlog_expression_all_one_dpi, ncomp = 14, center = TRUE, scale = TRUE)
+
+#set up pdf to save graphs
+PCA <- "Deseq_analysis/one_dpi_out/one_dpi_PCA_scores_plots.pdf"
+pdf(file = PCA)
+
+#plot pca for all samples comps 1 and 2
+plotIndiv(
+  pca_one_dpi, comp = c(1,2), group = rlog_classes_all_one_dpi, ind.names = FALSE, 
+  ellipse = TRUE, ellipse.level = 0.95, legend = TRUE, title = '1dpi PCA: PC1 vs PC2',
+  col.per.group = c("blue", "#117733", "#AA4499", "#DDCC77", "#33bbee", "#44AA99", "#882255", "#999933"),
+  pch = c(19,19,19,19,17,17,17,17), cex = 3, pch.levels = c("mock", "mock", "mock", "mock", "PM", "PM", "PM", "PM"),
+  size.xlabel = rel(2), size.ylabel = rel(2), size.axis = rel(1.5))
+
+plotIndiv(
+  pca_one_dpi, comp = c(1,3), group = rlog_classes_all_one_dpi, ind.names = FALSE, 
+  ellipse = TRUE, ellipse.level = 0.95, legend = TRUE, title = '1dpi PCA: PC1 vs PC3', 
+  col.per.group = c("blue", "#117733", "#AA4499", "#DDCC77", "#33bbee", "#44AA99", "#882255", "#999933"), 
+  pch = c(19,19,19,19,17,17,17,17), cex = 3, pch.levels = c("mock", "mock", "mock", "mock", "PM", "PM", "PM", "PM"),
+  size.xlabel = rel(2), size.ylabel = rel(2), size.axis = rel(1.5)) 
+
+plotIndiv(
+  pca_one_dpi, comp = c(2,3), group = rlog_classes_all_one_dpi, ind.names = FALSE, 
+  ellipse = TRUE, ellipse.level = 0.95, legend = TRUE, title = '1dpi PCA: PC2 vs PC3', 
+  col.per.group = c("blue", "#117733", "#AA4499", "#DDCC77", "#33bbee", "#44AA99", "#882255", "#999933"), 
+  pch = c(19,19,19,19,17,17,17,17), cex = 3, pch.levels = c("mock", "mock", "mock", "mock", "PM", "PM", "PM", "PM"),
+  size.xlabel = rel(2), size.ylabel = rel(2), size.axis = rel(1.5))
+
+dev.off()
+```
+
+#PCA LOADINGS 
+```{r}
+
+#set up pdf to save graphs
+pca_loadings <- "Deseq_analysis/one_dpi_out/one_dpi_PCA_loadings.pdf"
+pdf(file = pca_loadings)
+
+#extract loadings data
+one_dpi_pca_loadings <- as.data.frame(pca_one_dpi$loadings)
+
+#PC1 vs PC2
+ggplot(data = one_dpi_pca_loadings)+
+  geom_point(mapping = aes(x = X.PC1, y = X.PC2))+
+  scale_y_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  scale_x_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  xlab("Loadings 1")+
+  ylab("Loadings 2")+
+  ggtitle("1dpi loadings plot")
+
+#PC1 vs PC3
+ggplot(data = one_dpi_pca_loadings)+
+  geom_point(mapping = aes(x = X.PC1, y = X.PC3))+
+  scale_y_continuous(limits = c(-0.02,0.03), breaks = seq(-0.02,0.03,0.01))+
+  scale_x_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  xlab("Loadings 1")+
+  ylab("Loadings 3")+
+  ggtitle("1dpi loadings plot")
+
+#PC2 vs PC3
+ggplot(data = one_dpi_pca_loadings)+
+  geom_point(mapping = aes(x = X.PC2, y = X.PC3))+
+  scale_y_continuous(limits = c(-0.02,0.03), breaks = seq(-0.02,0.03,0.01))+
+  scale_x_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  xlab("Loadings 2")+
+  ylab("Loadings 3")+
+  ggtitle("1dpi loadings plot")
+
+dev.off()
+```
+
+#PCA SCREE PLOT
+```{r}
+#set up and plot scree plot
+one_dpi_expl_var <- as.data.frame(pca_one_dpi$prop_expl_var) #extract explained variance
+names(one_dpi_expl_var)[names(one_dpi_expl_var) == 'X'] <- 'percent_var' #rename percent col
+one_dpi_expl_var <- cbind(PC_index = 1:14, one_dpi_expl_var) #add PC_index column
+one_dpi_expl_var$percent_var <- one_dpi_expl_var$percent_var * 100 #convert decimal to percent
+one_dpi_expl_var$cum_var <- cumsum(one_dpi_expl_var$percent_var) #calculate cumulative variance explained
+one_dpi_expl_var$percent_var <- round(one_dpi_expl_var$percent_var, digits = 1) #round to 1dp
+one_dpi_expl_var$cum_var <- round(one_dpi_expl_var$cum_var, digits = 1)
+one_dpi_expl_var
+
+scree_plot <- ggplot(data = one_dpi_expl_var)+
+  geom_point(mapping = aes(x = PC_index, y = percent_var))+
+  geom_line(mapping = aes(x = PC_index, y = percent_var), col = "blue")+
+  geom_text(aes(x=PC_index, y=percent_var, label=percent_var), nudge_y = 4)+
+  geom_point(mapping = aes(x = PC_index, y = cum_var))+
+  geom_line(mapping = aes(x = PC_index, y = cum_var), col = "#117733")+
+  geom_text(aes(x=PC_index, y=cum_var, label=cum_var), nudge_y = 4)+
+  scale_x_continuous(breaks = seq(0,15, by = 1))+
+  xlab("PC index")+
+  ylab("Percentage of variance explained (%)")+
+  theme(panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(), panel.grid.minor.x = element_blank(), panel.grid.major.x = element_line(linetype = "dashed", colour = "grey"))+
+  ggtitle("1dpi Scree Plot")
+
+ggsave(filename = "one_dpi_PCA_scree_plot.pdf", plot = scree_plot, width = 15, height = 9, path = "Deseq_analysis/one_dpi_out", device = "pdf")
+```
+
+
+#PLSDA TUNING
+```{r}
+initial_plsda_one_dpi <- mixOmics::plsda(rlog_expression_all_one_dpi, rlog_classes_all_one_dpi, ncomp = 7)
+
+perf_initial_plsda_one_dpi <- perf(initial_plsda_one_dpi, 
+                                    validation = "loo", #use leave one out cross-validation
+                                    auc = TRUE, #calculate area under the curve performance of model
+                                    dist = "all") 
+
+plot(perf_initial_plsda_one_dpi) 
+
+print(perf_initial_plsda_one_dpi$choice.ncomp) 
+```
+
+#PLSDA SCORES
+```{r}
+final_plsda_one_dpi  <- mixOmics::plsda(rlog_expression_all_one_dpi, rlog_classes_all_one_dpi, ncomp = 7) 
+
+#set up pdf to save graphs
+plsda <- "Deseq_analysis/one_dpi_out/one_dpi_PLSDA_scores_plots.pdf"
+pdf(file = plsda)
+
+#plot final pls model for comps 1 and 2
+plotIndiv(
+  final_plsda_one_dpi, comp = c(1,2), group = rlog_classes_all_one_dpi, ind.names = FALSE, 
+  ellipse = TRUE, ellipse.level = 0.95, legend = TRUE, title = '1dpi PLSDA: Component 1 vs 2',
+  col.per.group = c("blue", "#117733", "#AA4499", "#DDCC77", "#33bbee", "#44AA99", "#882255", "#999933"), 
+  pch = c(19,19,19,19,17,17,17,17), cex = 3, pch.levels = c("mock", "mock", "mock", "mock", "PM", "PM", "PM", "PM"),
+  size.xlabel = rel(2), size.ylabel = rel(2), size.axis = rel(1.5))
+
+#plot final pls model for comps 1 and 3
+plotIndiv(
+  final_plsda_one_dpi, comp = c(1,3), group = rlog_classes_all_one_dpi, ind.names = FALSE, 
+  ellipse = TRUE, ellipse.level = 0.95, legend = TRUE, title = '1dpi PLSDA: Component 1 vs 3', 
+  col.per.group = c("blue", "#117733", "#AA4499", "#DDCC77", "#33bbee", "#44AA99", "#882255", "#999933"), 
+  pch = c(19,19,19,19,17,17,17,17), cex = 3, pch.levels = c("mock", "mock", "mock", "mock", "PM", "PM", "PM", "PM"),
+  size.xlabel = rel(2), size.ylabel = rel(2), size.axis = rel(1.5))
+
+#plot final pls model for comps 2 and 3
+plotIndiv(
+  final_plsda_one_dpi, comp = c(2,3), group = rlog_classes_all_one_dpi, ind.names = FALSE, 
+  ellipse = TRUE, ellipse.level = 0.95, legend = TRUE, title = '1dpi PLSDA: Component 2 vs 3',
+  col.per.group = c("blue", "#117733", "#AA4499", "#DDCC77", "#33bbee", "#44AA99", "#882255", "#999933"), 
+  pch = c(19,19,19,19,17,17,17,17), cex = 3, pch.levels = c("mock", "mock", "mock", "mock", "PM", "PM", "PM", "PM"),
+  size.xlabel = rel(2), size.ylabel = rel(2), size.axis = rel(1.5))
+
+dev.off()
+```
+
+#PLSDA LOADINGS
+```{r}
+#set up pdf to save graphs
+plsda_loadings <- "Deseq_analysis/one_dpi_out/one_dpi_PLSDA_loadings.pdf"
+pdf(file = plsda_loadings)
+
+#extract loadings data
+one_dpi_plsda_loadings <- as.data.frame(final_plsda_one_dpi$loadings[[1]])
+
+#PC1 vs PC2
+ggplot(data = one_dpi_plsda_loadings)+
+  geom_point(mapping = aes(x = comp1, y = comp2))+
+  scale_y_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  scale_x_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  xlab("Loadings 1")+
+  ylab("Loadings 2")+
+  ggtitle("1dpi loadings plot")
+
+#PC1 vs PC3
+ggplot(data = one_dpi_plsda_loadings)+
+  geom_point(mapping = aes(x = comp1, y = comp3))+
+  scale_y_continuous(limits = c(-0.03,0.03), breaks = seq(-0.03,0.03,0.01))+
+  scale_x_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  xlab("Loadings 1")+
+  ylab("Loadings 3")+
+  ggtitle("1dpi loadings plot")
+
+#PC2 vs PC3
+ggplot(data = one_dpi_plsda_loadings)+
+  geom_point(mapping = aes(x = comp2, y = comp3))+
+  scale_y_continuous(limits = c(-0.03,0.03), breaks = seq(-0.03,0.03,0.01))+
+  scale_x_continuous(limits = c(-0.02,0.02), breaks = seq(-0.02,0.02,0.01))+
+  xlab("Loadings 2")+
+  ylab("Loadings 3")+
+  ggtitle("1dpi loadings plot")
+
+dev.off()
+```
+
+#PLSDA AUROC 
+```{r}
+#set up pdf to save graphs
+plsda_auroc <- "Deseq_analysis/one_dpi_out/one_dpi_PLSDA_AUROC.pdf"
+pdf(file = plsda_auroc)
+
+#check performance of final model using aucroc curve
+auc.plsda.one.dpi_1 <- auroc(final_plsda_one_dpi, roc.comp = 1, print = TRUE)
+auc.plsda.one.dpi_1to2 <- auroc(final_plsda_one_dpi, roc.comp = 2, print = TRUE)
+auc.plsda.one.dpi_1to3 <- auroc(final_plsda_one_dpi, roc.comp = 3, print = TRUE) # AUROC for all 3 components
+
+dev.off()
+```
+
+
+
+#DESEQ ANALYSIS
+```{r, message=FALSE}
+#mock
+mock_one_dpi_DESeq_out <- DESeq(mock_one_dpi_raw_gene_data)
+
+#PM
+PM_one_dpi_DESeq_out <- DESeq(PM_one_dpi_raw_gene_data)
+```
+
+#EXTRACT DEGs
+```{r}
+#mock
+
+factor='condition'
+reference='Mock_Water'
+treatment='Mock_BABA'
+DEGs_1dpi_mock_BABA_vs_mock_Water <- results(mock_one_dpi_DESeq_out, contrast = c(factor, treatment, reference)) 
+
+factor='condition'
+reference='Mock_Water'
+treatment='Mock_JA'
+DEGs_1dpi_mock_JA_vs_mock_Water <- results(mock_one_dpi_DESeq_out, contrast = c(factor, treatment, reference))
+
+factor='condition'
+reference='Mock_Water'
+treatment='Mock_SA'
+DEGs_1dpi_mock_SA_vs_mock_Water <- results(mock_one_dpi_DESeq_out, contrast = c(factor, treatment, reference)) 
+
+#PM
+
+factor='condition'
+reference='PM_Water'
+treatment='PM_BABA'
+DEGs_1dpi_PM_BABA_vs_PM_Water <- results(PM_one_dpi_DESeq_out, contrast = c(factor, treatment, reference)) 
+
+factor='condition'
+reference='PM_Water'
+treatment='PM_JA'
+DEGs_1dpi_PM_JA_vs_PM_Water <- results(PM_one_dpi_DESeq_out, contrast = c(factor, treatment, reference)) 
+
+factor='condition'
+reference='PM_Water'
+treatment='PM_SA'
+DEGs_1dpi_PM_SA_vs_PM_Water <- results(PM_one_dpi_DESeq_out, contrast = c(factor, treatment, reference)) 
+```
+
+#SELECT PRIMED DEGs
+```{r}
+#note sig threshold of padj <= 0.05
+
+#select significant DEGs mock
+sig_DEGs_1dpi_mock_BABA_vs_mock_Water <- subset(DEGs_1dpi_mock_BABA_vs_mock_Water, DEGs_1dpi_mock_BABA_vs_mock_Water$padj <= 0.05)
+sig_DEGs_1dpi_mock_JA_vs_mock_Water <- subset(DEGs_1dpi_mock_JA_vs_mock_Water, DEGs_1dpi_mock_JA_vs_mock_Water$padj <= 0.05)
+sig_DEGs_1dpi_mock_SA_vs_mock_Water <- subset(DEGs_1dpi_mock_SA_vs_mock_Water, DEGs_1dpi_mock_SA_vs_mock_Water$padj <= 0.05)
+
+print(paste(nrow(sig_DEGs_1dpi_mock_BABA_vs_mock_Water), "significant mock BABA DEGs at 1dpi"))
+print(paste(nrow(sig_DEGs_1dpi_mock_JA_vs_mock_Water), "significant mock JA DEGs at 1dpi"))
+print(paste(nrow(sig_DEGs_1dpi_mock_SA_vs_mock_Water), "significant mock SA DEGs at 1dpi"))
+
+#select significant DEGs PM
+sig_DEGs_1dpi_PM_BABA_vs_PM_Water <- subset(DEGs_1dpi_PM_BABA_vs_PM_Water, DEGs_1dpi_PM_BABA_vs_PM_Water$padj <= 0.05)
+sig_DEGs_1dpi_PM_JA_vs_PM_Water <- subset(DEGs_1dpi_PM_JA_vs_PM_Water, DEGs_1dpi_PM_JA_vs_PM_Water$padj <= 0.05)
+sig_DEGs_1dpi_PM_SA_vs_PM_Water <- subset(DEGs_1dpi_PM_SA_vs_PM_Water, DEGs_1dpi_PM_SA_vs_PM_Water$padj <= 0.05)
+
+print(paste(nrow(sig_DEGs_1dpi_PM_BABA_vs_PM_Water), "significant PM BABA DEGs at 1dpi"))
+print(paste(nrow(sig_DEGs_1dpi_PM_JA_vs_PM_Water), "significant PM JA DEGs at 1dpi"))
+print(paste(nrow(sig_DEGs_1dpi_PM_SA_vs_PM_Water), "significant PM SA DEGs at 1dpi"))
+
+#select row names from mock treatment
+BABA_rows_to_remove <- rownames(sig_DEGs_1dpi_mock_BABA_vs_mock_Water)
+JA_rows_to_remove <- rownames(sig_DEGs_1dpi_mock_JA_vs_mock_Water)
+SA_rows_to_remove <- rownames(sig_DEGs_1dpi_mock_SA_vs_mock_Water)
+
+#select DEGs only present during infection (i.e., PM DEGs not shared with mock) = primed DEGs
+BABA_primed_all_1dpi <- sig_DEGs_1dpi_PM_BABA_vs_PM_Water[!rownames(sig_DEGs_1dpi_PM_BABA_vs_PM_Water) %in% BABA_rows_to_remove,]
+JA_primed_all_1dpi <- sig_DEGs_1dpi_PM_JA_vs_PM_Water[!rownames(sig_DEGs_1dpi_PM_JA_vs_PM_Water) %in% JA_rows_to_remove,]
+SA_primed_all_1dpi <- sig_DEGs_1dpi_PM_SA_vs_PM_Water[!rownames(sig_DEGs_1dpi_PM_SA_vs_PM_Water) %in% SA_rows_to_remove,]
+
+print(paste(nrow(BABA_primed_all_1dpi), "total primed BABA DEGs at 1dpi"))
+print(paste(nrow(JA_primed_all_1dpi), "total primed JA DEGs at 1dpi"))
+print(paste(nrow(SA_primed_all_1dpi), "total primed SA DEGs at 1dpi"))
+
+#select row names for primed DEGs
+BABA_primed_rows_to_remove <- rownames(BABA_primed_all_1dpi)
+JA_primed_rows_to_remove <- rownames(JA_primed_all_1dpi)
+SA_primed_rows_to_remove <- rownames(SA_primed_all_1dpi)
+
+#select primed DEGs exclusive to each treatment
+BABA_primed_exclusive_1dpi <- BABA_primed_all_1dpi[!rownames(BABA_primed_all_1dpi) %in% JA_primed_rows_to_remove,]
+BABA_primed_exclusive_1dpi <- BABA_primed_exclusive_1dpi[!rownames(BABA_primed_exclusive_1dpi) %in% SA_primed_rows_to_remove,]
+JA_primed_exclusive_1dpi <- JA_primed_all_1dpi[!rownames(JA_primed_all_1dpi) %in% BABA_primed_rows_to_remove,]
+JA_primed_exclusive_1dpi <- JA_primed_exclusive_1dpi[!rownames(JA_primed_exclusive_1dpi) %in% SA_primed_rows_to_remove,]
+SA_primed_exclusive_1dpi <- SA_primed_all_1dpi[!rownames(SA_primed_all_1dpi) %in% BABA_primed_rows_to_remove,]
+SA_primed_exclusive_1dpi <- SA_primed_exclusive_1dpi[!rownames(SA_primed_exclusive_1dpi) %in% JA_primed_rows_to_remove,]
+
+print(paste(nrow(BABA_primed_exclusive_1dpi), "BABA exclusive primed DEGs at 1dpi"))
+print(paste(nrow(JA_primed_exclusive_1dpi), "JA exclusive primed DEGs at 1dpi"))
+print(paste(nrow(SA_primed_exclusive_1dpi), "SA exclusive primed DEGs at 1dpi"))
+```
+
+#EXTRACT UP/DOWN PRIMED DEGs fc1
+```{r}
+#MOCK UP
+UP_BABA_mock_1dpi <- subset(DEGs_1dpi_mock_BABA_vs_mock_Water, DEGs_1dpi_mock_BABA_vs_mock_Water$log2FoldChange > 1 & DEGs_1dpi_mock_BABA_vs_mock_Water$padj <= 0.05)
+
+UP_JA_mock_1dpi <- subset(DEGs_1dpi_mock_JA_vs_mock_Water, DEGs_1dpi_mock_JA_vs_mock_Water$log2FoldChange > 1 & DEGs_1dpi_mock_JA_vs_mock_Water$padj <= 0.05)
+
+UP_SA_mock_1dpi <- subset(DEGs_1dpi_mock_SA_vs_mock_Water, DEGs_1dpi_mock_SA_vs_mock_Water$log2FoldChange > 1 & DEGs_1dpi_mock_SA_vs_mock_Water$padj <= 0.05)
+
+#MOCK DOWN
+DOWN_BABA_mock_1dpi <- subset(DEGs_1dpi_mock_BABA_vs_mock_Water, DEGs_1dpi_mock_BABA_vs_mock_Water$log2FoldChange < -1 & DEGs_1dpi_mock_BABA_vs_mock_Water$padj <= 0.05)
+
+DOWN_JA_mock_1dpi <- subset(DEGs_1dpi_mock_JA_vs_mock_Water, DEGs_1dpi_mock_JA_vs_mock_Water$log2FoldChange < -1 & DEGs_1dpi_mock_JA_vs_mock_Water$padj <= 0.05)
+
+DOWN_SA_mock_1dpi <- subset(DEGs_1dpi_mock_SA_vs_mock_Water, DEGs_1dpi_mock_SA_vs_mock_Water$log2FoldChange < -1 & DEGs_1dpi_mock_SA_vs_mock_Water$padj <= 0.05)
+
+#PM UP
+UP_BABA_PM_1dpi <- subset(DEGs_1dpi_PM_BABA_vs_PM_Water, DEGs_1dpi_PM_BABA_vs_PM_Water$log2FoldChange > 1 & DEGs_1dpi_PM_BABA_vs_PM_Water$padj <= 0.05)
+
+UP_JA_PM_1dpi <- subset(DEGs_1dpi_PM_JA_vs_PM_Water, DEGs_1dpi_PM_JA_vs_PM_Water$log2FoldChange > 1 & DEGs_1dpi_PM_JA_vs_PM_Water$padj <= 0.05)
+
+UP_SA_PM_1dpi <- subset(DEGs_1dpi_PM_SA_vs_PM_Water, DEGs_1dpi_PM_SA_vs_PM_Water$log2FoldChange > 1 & DEGs_1dpi_PM_SA_vs_PM_Water$padj <= 0.05)
+
+#PM DOWN
+DOWN_BABA_PM_1dpi <- subset(DEGs_1dpi_PM_BABA_vs_PM_Water, DEGs_1dpi_PM_BABA_vs_PM_Water$log2FoldChange < -1 & DEGs_1dpi_PM_BABA_vs_PM_Water$padj <= 0.05)
+
+DOWN_JA_PM_1dpi <- subset(DEGs_1dpi_PM_JA_vs_PM_Water, DEGs_1dpi_PM_JA_vs_PM_Water$log2FoldChange < -1 & DEGs_1dpi_PM_JA_vs_PM_Water$padj <= 0.05)
+
+DOWN_SA_PM_1dpi <- subset(DEGs_1dpi_PM_SA_vs_PM_Water, DEGs_1dpi_PM_SA_vs_PM_Water$log2FoldChange < -1 & DEGs_1dpi_PM_SA_vs_PM_Water$padj <= 0.05)
+
+#PRIMED UP ALL - FOR VENN
+UP_BABA_primed_all_1dpi <- subset(BABA_primed_all_1dpi, BABA_primed_all_1dpi$log2FoldChange > 1 & BABA_primed_all_1dpi$padj <= 0.05) 
+
+UP_JA_primed_all_1dpi <- subset(JA_primed_all_1dpi, JA_primed_all_1dpi$log2FoldChange > 1 & JA_primed_all_1dpi$padj <= 0.05) 
+
+UP_SA_primed_all_1dpi <- subset(SA_primed_all_1dpi, SA_primed_all_1dpi$log2FoldChange > 1 & SA_primed_all_1dpi$padj <= 0.05) 
+
+#PRIMED DOWN ALL - FOR VENN
+DOWN_BABA_primed_all_1dpi <- subset(BABA_primed_all_1dpi, BABA_primed_all_1dpi$log2FoldChange < -1 & BABA_primed_all_1dpi$padj <= 0.05) 
+
+DOWN_JA_primed_all_1dpi <- subset(JA_primed_all_1dpi, JA_primed_all_1dpi$log2FoldChange < -1 & JA_primed_all_1dpi$padj <= 0.05) 
+
+DOWN_SA_primed_all_1dpi <- subset(SA_primed_all_1dpi, SA_primed_all_1dpi$log2FoldChange < -1 & SA_primed_all_1dpi$padj <= 0.05) 
+```
+
+#DATA SUMMARY TABLE
+```{r}
+one_dpi_summary_data <-
+  data.frame('Timepoint' = 
+             c("1dpi", "1dpi", "1dpi", "1dpi", "1dpi", "1dpi", "1dpi", "1dpi", "1dpi"), 
+           'Comparison' = 
+             c("Mock BABA vs Mock Water", "Mock SA vs Mock Water", "Mock JA vs Mock Water", 
+               "PM BABA vs PM Water", "PM SA vs PM Water", "PM JA vs PM Water",
+               "BABA primed", "SA primed", "JA primed"),
+           'All_significant_DEGs' = 
+             c(nrow(sig_DEGs_1dpi_mock_BABA_vs_mock_Water), nrow(sig_DEGs_1dpi_mock_SA_vs_mock_Water), nrow(sig_DEGs_1dpi_mock_JA_vs_mock_Water),
+               nrow(sig_DEGs_1dpi_PM_BABA_vs_PM_Water), nrow(sig_DEGs_1dpi_PM_SA_vs_PM_Water), nrow(sig_DEGs_1dpi_PM_JA_vs_PM_Water),
+               nrow(BABA_primed_all_1dpi), nrow(SA_primed_all_1dpi), nrow(JA_primed_all_1dpi)),
+           'Upregulated_DEGs' =
+             c(nrow(UP_BABA_mock_1dpi), nrow(UP_SA_mock_1dpi), nrow(UP_JA_mock_1dpi),
+               nrow(UP_BABA_PM_1dpi), nrow(UP_SA_PM_1dpi), nrow(UP_JA_PM_1dpi),
+               nrow(UP_BABA_primed_all_1dpi), nrow(UP_SA_primed_all_1dpi), nrow(UP_JA_primed_all_1dpi)),
+           'Downregulated_DEGs' =
+             c(nrow(DOWN_BABA_mock_1dpi), nrow(DOWN_SA_mock_1dpi), nrow(DOWN_JA_mock_1dpi),
+               nrow(DOWN_BABA_PM_1dpi), nrow(DOWN_SA_PM_1dpi), nrow(DOWN_JA_PM_1dpi),
+               nrow(DOWN_BABA_primed_all_1dpi), nrow(DOWN_SA_primed_all_1dpi), nrow(DOWN_JA_primed_all_1dpi))
+           )
+
+
+#save one dpi summary
+write.csv(one_dpi_summary_data, "Deseq_analysis/one_dpi_out/summary_data_1dpi_fc1.csv", row.names=FALSE)
+```
+
+#VENN DIAGRAMS
+```{r}
+#sa = yellow, ja = magenta baba = dark-green
+
+#set up pdf to save graphs
+venns <- "Deseq_analysis/one_dpi_out/one_dpi_Venn_diagrams_fc1.pdf"
+pdf(file = venns)
+
+#all primed DEGs
+Venn_BABA_primed_all_1dpi <- row.names(BABA_primed_all_1dpi)
+Venn_SA_primed_all_1dpi <- row.names(SA_primed_all_1dpi)
+Venn_JA_primed_all_1dpi <- row.names(JA_primed_all_1dpi)
+
+vennPlot <- venn.diagram(list(Venn_SA_primed_all_1dpi, Venn_JA_primed_all_1dpi, Venn_BABA_primed_all_1dpi), filename = NULL, fill=c("#DDCC77", "#AA4499", "#117733"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5,0.5), cex=2.5, category.names = c(" "," ", " "), main = "All primed DEGs 1dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.1, ext.pos = 3, ext.length = 0.7, ext.dist = -0.02)
+grid.newpage()
+grid.draw(vennPlot)
+
+#upregulated genes
+Venn_UP_BABA_primed <- row.names(UP_BABA_primed_all_1dpi)
+Venn_UP_SA_primed <- row.names(UP_SA_primed_all_1dpi)
+Venn_UP_JA_primed <- row.names(UP_JA_primed_all_1dpi)
+
+vennPlot <- venn.diagram(list(Venn_UP_SA_primed, Venn_UP_JA_primed, Venn_UP_BABA_primed), filename = NULL, fill=c("#DDCC77", "#AA4499", "#117733"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5,0.5), cex=2.5, category.names = c(" "," ", " "), main = "Upregulated primed genes 1dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.1, ext.pos = 3, ext.length = 0.7, ext.dist = -0.02)
+grid.newpage()
+grid.draw(vennPlot)
+
+#downregulated genes
+Venn_DOWN_BABA_primed <- row.names(DOWN_BABA_primed_all_1dpi)
+Venn_DOWN_SA_primed <- row.names(DOWN_SA_primed_all_1dpi)
+Venn_DOWN_JA_primed <- row.names(DOWN_JA_primed_all_1dpi)
+
+vennPlot <- venn.diagram(list(Venn_DOWN_SA_primed, Venn_DOWN_JA_primed, Venn_DOWN_BABA_primed), filename = NULL, fill=c("#DDCC77", "#AA4499", "#117733"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5,0.5), cex=2.5, category.names = c(" "," ", " "), main = "Downregulated primed genes 1dpi", main.cex = 2, ext.text = TRUE, ext.percent = 0.1, ext.pos = 3, ext.length = 0.7, ext.dist = -0.02)
+grid.newpage()
+grid.draw(vennPlot)
+
+dev.off()
+```
+
+#GENE CLUSTERING HEATMAP
+```{r, warning=FALSE}
+#set up pdf to save graphs
+heatmaps <- "Deseq_analysis/one_dpi_out/one_dpi_heatmaps.pdf"
+pdf(file = heatmaps)
+
+#select significant DEGs for BABA mock
+significant_BABA_mock_DEGs_heatmap <- DEGs_1dpi_mock_BABA_vs_mock_Water$padj <= 0.05 
+
+sum(significant_BABA_mock_DEGs_heatmap, na.rm = TRUE) #check number = same as before
+
+#select significant DEGs for SA mock
+significant_SA_mock_DEGs_heatmap <- DEGs_1dpi_mock_SA_vs_mock_Water$padj <= 0.05 
+
+sum(significant_SA_mock_DEGs_heatmap, na.rm = TRUE) #check number = same as before
+
+#select significant DEGs for JA mock
+significant_JA_mock_DEGs_heatmap <- DEGs_1dpi_mock_JA_vs_mock_Water$padj <= 0.05 
+
+sum(significant_JA_mock_DEGs_heatmap, na.rm = TRUE) #check number = same as before
+
+#select significant DEGs for BABA PM
+significant_BABA_PM_DEGs_heatmap <- DEGs_1dpi_PM_BABA_vs_PM_Water$padj <= 0.05 
+
+sum(significant_BABA_PM_DEGs_heatmap, na.rm = TRUE) #check number = same as before
+
+#select significant DEGs for SA PM
+significant_SA_PM_DEGs_heatmap <- DEGs_1dpi_PM_SA_vs_PM_Water$padj <= 0.05 
+
+sum(significant_SA_PM_DEGs_heatmap, na.rm = TRUE) #check number = same as before
+
+#select significant DEGs for JA PM
+significant_JA_PM_DEGs_heatmap <- DEGs_1dpi_PM_JA_vs_PM_Water$padj <= 0.05 
+
+sum(significant_JA_PM_DEGs_heatmap, na.rm = TRUE) #check number = same as before
+
+#combine significant DEGs into single vector = merges duplicates
+significant_all_DEGs_heatmap <- base::Reduce('|', list(significant_BABA_mock_DEGs_heatmap, significant_SA_mock_DEGs_heatmap, significant_JA_mock_DEGs_heatmap, significant_BABA_PM_DEGs_heatmap, significant_SA_PM_DEGs_heatmap, significant_JA_PM_DEGs_heatmap))
+
+sum(significant_all_DEGs_heatmap, na.rm = TRUE) #check number 
+
+#create df
+heatmap_df <- data.frame(assay(rlog_all_one_dpi_raw_gene_data)[which(significant_all_DEGs_heatmap),])
+
+#remove rows containing all zeros
+heatmap_df[heatmap_df==0] <- NA #convert 0 to NAs
+heatmap_df <- na.omit(heatmap_df) #remove NAs
+
+#calculate mean
+m = apply(heatmap_df, 1, mean, na.rm = T)
+
+#calculate sd
+sd = apply(heatmap_df, 1, sd, na.rm = T)
+
+#scale
+scaled_heatmap_df <- (heatmap_df - m)/sd
+
+# #note scaling is based on the scale_rows function within pheatmap which performs the following 
+# scale_rows = function(x){
+#     m = apply(x, 1, mean, na.rm = T)
+#     s = apply(x, 1, sd, na.rm = T)
+#     return((x - m) / s)}
+
+#set up gene clustering dendrogram
+gene_dend <- as.dendrogram(hclust(dist(scaled_heatmap_df))) 
+#dist calculates distances using euclidean distances as default 
+#hclust performs hierarchical clustering using the complete linkage method by default
+
+gene_dend #height = 10.80835
+
+#try different heights to cut tree to find optimal number of clusters to colour code
+gene_dend1 <- color_branches(gene_dend, h=10.8, col = brewer.pal(8,"Dark2"))
+plot(gene_dend1, main = "cut height 10.8") #3 clusters = too few
+
+#based on first plot a cut around 10.5 should be about right
+gene_dend2 <- color_branches(gene_dend, h=10.5, col = brewer.pal(8,"Dark2"))
+plot(gene_dend2, main = "cut height 10.5") #7 clusters = probably about right
+
+gene_dend3 <- color_branches(gene_dend, h=10.4, col = brewer.pal(8,"Dark2"))
+plot(gene_dend3, main = "cut height 10.4") #10 clusters = probably too many
+
+gene_dend4 <- color_branches(gene_dend, h=10.6, col = brewer.pal(8,"Dark2"))
+plot(gene_dend4, main = "cut height 10.6") #5 clusters = probaly too few
+
+#save optimal number of clusters as k, based on trying both 10.6 and 10.5 use 10.5
+cut <- cutree(gene_dend, h=10.5)
+k <- as.numeric(max(levels(as.factor(cut))))
+
+#set up sample annotations for plots
+sample_annotations <- all_one_dpi_sample_info[,3]
+conditions <- HeatmapAnnotation(Condition = sample_annotations, col = list(Condition = c("Mock_Water" = "blue", "Mock_BABA" = "#117733", "Mock_JA" = "#AA4499", "Mock_SA" = "#DDCC77", "PM_Water" = "#33bbee", "PM_BABA" = "#44AA99", "PM_JA" =  "#882255", "PM_SA" = "#999933")), gp = gpar(col = "black"))
+
+#set up column split to separate mock and infected in plots
+column_split = rep("Mock", 31)
+column_split[17:31] = "PM"
+
+#plot heatmap
+htmp1 <- ComplexHeatmap::Heatmap(scaled_heatmap_df, cluster_columns = FALSE, 
+                                 cluster_rows = gene_dend2, #use optimal cluster dendrogram for colour coding
+                                 split = k, #split up dendrogram to number clusters
+                                 col = viridis(7), show_row_names = FALSE, 
+                                 heatmap_legend_param = list(title = NULL, direction = "horizontal", at = c(-5,-2.5,0,2.5,5)), 
+                                 top_annotation = conditions, show_column_names = FALSE, column_split = column_split)
+
+draw(htmp1, heatmap_legend_side = "bottom")
+
+dev.off()
+```
+
+#SAVE COUNTS + BABA PRIMING DATA FOR INTEGRATION
+```{r}
+#EXTRACT COUNTS FOR 1DPI
+
+#select counts data
+counts_1dpi <- as.data.frame(counts(all_one_dpi_raw_gene_data)) 
+
+#add column of gene names
+counts_1dpi <- cbind(gene = row.names(counts_1dpi), counts_1dpi) 
+
+#save counts data
+write.csv(counts_1dpi, 
+          file = "Deseq_analysis/one_dpi_out/gene_counts_1dpi.csv",
+          row.names = FALSE)
+
+#SELECT GENES EXCLUSIVE TO BABA PRIMING
+BABA_primed_1dpi <- data.frame(gene = rownames(BABA_primed_exclusive_1dpi)) 
+
+#LOAD COUNTS DATA FOR 0 AND 2DPI
+
+#load 0dpi counts
+counts_0dpi <- read.csv(file = "Deseq_analysis/zero_dpi_out/gene_counts_0dpi.csv")
+
+#load 2dpi counts
+counts_2dpi <- read.csv(file = "Deseq_analysis/two_dpi_out/gene_counts_2dpi.csv")
+
+#FILTER NON-PRIMED GENES FROM COUNTS DATA
+#here we select only genes in gene_counts data that are exclusive to BABA priming at 1dpi
+
+#0dpi
+BABA_primed_counts_0dpi <- subset(counts_0dpi, gene %in% BABA_primed_1dpi$gene) 
+
+#1dpi
+BABA_primed_counts_1dpi <- subset(counts_1dpi, gene %in% BABA_primed_1dpi$gene) 
+
+#2dpi
+BABA_primed_counts_2dpi <- subset(counts_2dpi, gene %in% BABA_primed_1dpi$gene) 
+
+#MERGE, PREP AND SAVE FINAL TABLE
+#note done starting with 2dpi so columns in time order in final df
+
+#append 2dpi gene counts to BABA primed 1dpi gene names
+BABA_primed_gene_names_and_counts_1dpi <- as.data.frame(append(BABA_primed_counts_2dpi, BABA_primed_1dpi))
+
+#append 1dpi gene counts to BABA primed 1dpi gene names
+BABA_primed_gene_names_and_counts_1dpi <- as.data.frame(append(BABA_primed_counts_1dpi, BABA_primed_gene_names_and_counts_1dpi))
+
+#append 0dpi gene counts to BABA primed 1dpi gene names
+BABA_primed_gene_names_and_counts_1dpi <- as.data.frame(append(BABA_primed_counts_0dpi, BABA_primed_gene_names_and_counts_1dpi)) 
+
+#remove gene name columns added from gene_counts
+BABA_primed_gene_names_and_counts_1dpi <- subset(BABA_primed_gene_names_and_counts_1dpi, select = c(-17, -49, -81))
+
+#save final df as csv
+write.csv(BABA_primed_gene_names_and_counts_1dpi, file = "Deseq_analysis/one_dpi_out/BABA_primed_genes_1dpi_counts.csv", row.names = FALSE)
+```
+
+#SAVE DATA FOR GO TERM ANALYSIS
+```{r}
+load(file = "GO_analysis/R_topGO/Initial_GO_input_data_fc1.RData") #load data save for 0dpi
+
+#save 0dpi + 1dpi primed data
+save(zero_dpi_raw_gene_data,
+     DEGs_0dpi_BABA, 
+     DEGs_0dpi_SA, 
+     DEGs_0dpi_JA,
+     BABA_primed_all_1dpi,
+     SA_primed_all_1dpi,
+     JA_primed_all_1dpi,
+     DOWN_BABA_primed_all_1dpi,
+     DOWN_SA_primed_all_1dpi,
+     DOWN_JA_primed_all_1dpi,
+     UP_BABA_primed_all_1dpi,
+     UP_SA_primed_all_1dpi,
+     UP_JA_primed_all_1dpi,
+     file = "GO_analysis/R_topGO/Initial_GO_input_data_fc1.RData")
+```
+
+
