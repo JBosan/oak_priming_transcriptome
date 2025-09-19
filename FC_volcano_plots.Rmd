@@ -1,0 +1,156 @@
+---
+title: "fold change volcano_plots"
+output: word_document
+date: "2024-07-05"
+---
+# SET-UP
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()) #set working directory to rproject root
+```
+
+```{r, message=FALSE}
+library(DESeq2) #for analyzing differential gene expression
+library(tidyverse) #for lots of things
+library(EnhancedVolcano) #for volcano plots
+```
+
+# LOAD 0DPI DATA
+```{r warning=FALSE}
+#read in sample info file
+#note have combined mock and different elicitors into single "condition column" as only comparing effect of elicitors 
+zero_dpi_sample_info <- read.table("raw_count/0dpi/sample_info_0dpi.csv", header = TRUE, sep = ",")
+
+#add rownames to sample info = for labelling of plots (e.g., heatmaps)
+row.names(zero_dpi_sample_info) <- zero_dpi_sample_info$sample_name
+
+#create factors for condition column so that water will be used as intercept/base-line/reference for the model
+zero_dpi_sample_info$condition <- factor(zero_dpi_sample_info$condition, levels = c("Mock_Water", "Mock_BABA", "Mock_JA", "Mock_SA"))
+
+#visualize the model matrix that will be used by Deseq2
+model.matrix(~condition, data = zero_dpi_sample_info)
+#should display 4 columns - intercept (MW), MB, MJA, MSA
+
+#read in gene counts data
+zero_dpi_raw_gene_data <- DESeqDataSetFromHTSeqCount(
+  sampleTable = zero_dpi_sample_info, directory = 'raw_count/0dpi',
+  design = ~ condition)
+```
+
+# DESEQ ANALYSIS 0DPI
+```{r, message=FALSE}
+#estimation of size factors, estimation of dispersion, and Negative Binomial GLM fitting and Wald statistics
+zero_dpi_DESeq_out <- DESeq(zero_dpi_raw_gene_data)
+```
+
+# EXTRACT DEGs 0DPI
+```{r}
+factor='condition'
+reference='Mock_Water'
+treatment='Mock_BABA'
+DEGs_0dpi_BABA <- results(zero_dpi_DESeq_out, contrast = c(factor, treatment, reference)) 
+
+factor='condition'
+reference='Mock_Water'
+treatment='Mock_SA'
+DEGs_0dpi_SA <- results(zero_dpi_DESeq_out, contrast = c(factor, treatment, reference))
+
+factor='condition'
+reference='Mock_Water'
+treatment='Mock_JA'
+DEGs_0dpi_JA <- results(zero_dpi_DESeq_out, contrast = c(factor, treatment, reference))
+```
+
+# VOLCANO PLOTS 0DPI
+```{r}
+#create tibble of data i.e. gene, padj val, log2fc val
+volcano_data <- tibble(gene = row.names(DEGs_0dpi_BABA), 
+                       padj = DEGs_0dpi_BABA$padj, 
+                       fc = DEGs_0dpi_BABA$log2FoldChange)
+
+#create colour codes
+colour_codes <- c("UP" = "#DCE319FF","DOWN" = "#440154FF","P-ADJ" = "grey","REST" = "grey")
+
+p1 <- volcano_data %>%
+  mutate(colour = case_when(
+    fc > 0.5 & padj <= 0.05 ~ "UP", #mark upregulated genes
+    fc < -0.5 & padj <= 0.05 ~ "DOWN", #mark downregulated genes
+    fc > -0.5 & fc < 0.5 & padj <= 0.05 ~ "P-ADJ", #mark sig genes that dont pass fc cutoff
+    padj > 0.05 ~ "REST")) %>% #mark non sig genes 
+  na.omit() %>% #remove NAs
+  ggplot()+ 
+  geom_point(mapping = aes(x = fc, y = -log(padj, 10), color = colour))+ #plot log2fc vs -log10(padj)
+  scale_color_manual(values = colour_codes, guide = "none")+ #colour code points and remove legend
+  geom_vline(xintercept = 0.5, linetype = "dashed")+ #add dashed line for fc threshold
+  geom_vline(xintercept = -0.5, linetype = "dashed")+ #add dashed line for fc threshold
+  geom_hline(yintercept = -log(0.05, 10), linetype = "dashed")+ #add dashed line for padj threshold
+  xlab(expression("Log"[2]*" Fold-Change"))+ #add xlab, use expression() to get subscript 2
+  ylab(expression("-log"[10]*" Adjusted P-value"))+ #add ylab, use expression() to get subscript 10
+  scale_x_continuous(breaks = c(0.5, -0.5, seq(-18,15,3)))+ #set x-axis breaks so fc threshold marked
+  scale_y_continuous(breaks = c(0, round(-log10(0.05),2), 5, 10, 15, 20))+ #alter y-axis breaks so -log10(0.05) is marked
+  theme(panel.grid.major = element_blank(), #remove major grid lines
+        panel.grid.minor = element_blank(), #remove minor grid lines
+        panel.background = element_rect(fill = "#f5f5f5"), #light grey background to match other graphs
+        axis.line = element_line()) #add lines to axis
+
+p2 <- volcano_data %>%
+  mutate(colour = case_when(
+    fc > 1 & padj <= 0.05 ~ "UP", #mark upregulated genes
+    fc < -1 & padj <= 0.05 ~ "DOWN", #mark downregulated genes
+    fc > -1 & fc < 1 & padj <= 0.05 ~ "P-ADJ", #mark sig genes that dont pass fc cutoff
+    padj > 0.05 ~ "REST")) %>% #mark non sig genes 
+  na.omit() %>% #remove NAs
+  ggplot()+ 
+  geom_point(mapping = aes(x = fc, y = -log(padj, 10), color = colour))+ #plot log2fc vs -log10(padj)
+  scale_color_manual(values = colour_codes, guide = "none")+ #colour code points and remove legend
+  geom_vline(xintercept = 1, linetype = "dashed")+ #add dashed line for fc threshold
+  geom_vline(xintercept = -1, linetype = "dashed")+ #add dashed line for fc threshold
+  geom_hline(yintercept = -log(0.05, 10), linetype = "dashed")+ #add dashed line for padj threshold
+  xlab(expression("Log"[2]*" Fold-Change"))+ #add xlab, use expression() to get subscript 2
+  ylab(expression("-log"[10]*" Adjusted P-value"))+ #add ylab, use expression() to get subscript 10
+  scale_x_continuous(breaks = c(1, -1, seq(-18,15,3)))+ #set x-axis breaks so fc threshold marked
+  scale_y_continuous(breaks = c(0, round(-log10(0.05),2), 5, 10, 15, 20))+ #alter y-axis breaks so -log10(0.05) is marked
+  theme(panel.grid.major = element_blank(), #remove major grid lines
+        panel.grid.minor = element_blank(), #remove minor grid lines
+        panel.background = element_rect(fill = "#f5f5f5"), #light grey background to match other graphs
+        axis.line = element_line()) #add lines to axis
+
+p3 <- volcano_data %>%
+  mutate(colour = case_when(
+    fc > 2 & padj <= 0.05 ~ "UP", #mark upregulated genes
+    fc < -2 & padj <= 0.05 ~ "DOWN", #mark downregulated genes
+    fc > -2 & fc < 2 & padj <= 0.05 ~ "P-ADJ", #mark sig genes that dont pass fc cutoff
+    padj > 0.05 ~ "REST")) %>% #mark non sig genes 
+  na.omit() %>% #remove NAs
+  ggplot()+ 
+  geom_point(mapping = aes(x = fc, y = -log(padj, 10), color = colour))+ #plot log2fc vs -log10(padj)
+  scale_color_manual(values = colour_codes, guide = "none")+ #colour code points and remove legend
+  geom_vline(xintercept = 2, linetype = "dashed")+ #add dashed line for fc threshold
+  geom_vline(xintercept = -2, linetype = "dashed")+ #add dashed line for fc threshold
+  geom_hline(yintercept = -log(0.05, 10), linetype = "dashed")+ #add dashed line for padj threshold
+  xlab(expression("Log"[2]*" Fold-Change"))+ #add xlab, use expression() to get subscript 2
+  ylab(expression("-log"[10]*" Adjusted P-value"))+ #add ylab, use expression() to get subscript 10
+  scale_x_continuous(breaks = c(2, -2, seq(-18,15,3)))+ #set x-axis breaks so fc threshold marked
+  scale_y_continuous(breaks = c(0, round(-log10(0.05),2), 5, 10, 15, 20))+ #alter y-axis breaks so -log10(0.05) is marked
+  theme(panel.grid.major = element_blank(), #remove major grid lines
+        panel.grid.minor = element_blank(), #remove minor grid lines
+        panel.background = element_rect(fill = "#f5f5f5"), #light grey background to match other graphs
+        axis.line = element_line()) #add lines to axis
+
+ggsave(filename = "Deseq_analysis/zero_dpi_out/fc_0.5_volcano.pdf", p1, device = pdf, width = 15, height = 8)
+
+ggsave(filename = "Deseq_analysis/zero_dpi_out/fc_1_volcano.pdf", p2, device = pdf, width = 15, height = 8)
+
+ggsave(filename = "Deseq_analysis/zero_dpi_out/fc_2_volcano.pdf", p3, device = pdf, width = 15, height = 8)
+```
+
+
+
+
+
+
+
+
+
+
