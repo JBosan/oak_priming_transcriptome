@@ -1,0 +1,66 @@
+---
+title: "GO_comparison"
+output: word_document
+date: "2024-10-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()) #set working directory to rproject root
+```
+
+# Load packages
+```{r, message=FALSE}
+library('data.table') #for loading large files (i.e. GO annotations)
+library("VennDiagram") #for plotting venn diagrams
+library("tidyverse") #for data manipulation
+```
+
+# Load data
+
+Will load the following data
+
+- GO annotations produced using Trinotate for this study
+- GO annotations produced in previous study using Blast2GO:
+
+KASUGA, T., HAYDEN, K.J., EYRE, C.A., CROUCHER, P.J.P., SCHECHTER, S., WRIGHT, J.W., and GARBELOTTO, M. (2021). ‘Innate Resistance and Phosphite Treatment Affect Both the Pathogen's and Host's Transcriptomes in the Tanoak-Phytophthora ramorum Pathosystem,’ Journal of Fungi, 7(3), pp. doi:10.3390/jof7030198.
+
+```{r}
+#load trinotate data
+trinotate_GO_df <- fread(file = "GO_analysis/R_topGO/trinotate_GO_terms.tsv", sep = "\t", sep2 = ",", header = FALSE)
+
+#load data from previous study
+kasuga_2021_GO_df <- fread(file = "GO_analysis/R_topGO/Kasuga_2021_TableS2_GOs.csv", sep = ",", sep2 = ";", header = FALSE, na.strings = "NULL")
+
+kasuga_2021_GO_df <- na.omit(kasuga_2021_GO_df) #remove NAs as not all genes annotated with GO terms
+```
+
+# Check number of annotated transcripts
+
+```{r}
+print(paste("Trinotate annotated", nrow(trinotate_GO_df), "transcripts"))
+print(paste("Blast2GO annotated", nrow(kasuga_2021_GO_df), "transcripts"))
+```
+
+# Check overlap between annotated transcripts for both methods
+
+```{r, message=FALSE}
+#set up pdf to save graphs
+venns <- "GO_analysis/R_topGO/kasuga_2021_v_trinotate_venns.pdf"
+pdf(file = venns, width = 10, height = 10)
+
+vennPlot <- venn.diagram(
+  list(trinotate_GO_df$V1, kasuga_2021_GO_df$V1), filename = NULL, 
+  fill=c("#9498F8", "#F19B98"), print.mode = c("raw", "percent"), alpha=c(0.5,0.5), cex=1.5,
+  category.names = c(" "," "), main = "Shared GO annotated transcripts", main.cex = 2, ext.text = TRUE, 
+  ext.percent = 0.1, ext.pos = 0, ext.length = 0.7, ext.dist = -0.01, disable.logging = TRUE)
+
+grid.newpage()
+
+grid.draw(vennPlot)
+
+#kasuga = "#F19B98"
+#trinotate = "#9498F8"
+```
+
