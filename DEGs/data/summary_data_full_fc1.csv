@@ -1,0 +1,16 @@
+Timepoint,Condition,All_significant_DEGs,Upregulated_DEGs,Downregulated_DEGs
+0dpi,Mock BABA,1774,703,415
+0dpi,Mock SA,2094,1142,298
+0dpi,Mock JA,2111,628,599
+1dpi,Mock BABA,366,185,75
+1dpi,Mock SA,3431,1083,974
+1dpi,Mock JA,1114,392,248
+1dpi,PM BABA,6458,2170,1307
+1dpi,PM SA,5095,1050,1521
+1dpi,PM JA,3955,1503,749
+2dpi,Mock BABA,1452,504,421
+2dpi,Mock SA,1591,682,502
+2dpi,Mock JA,1159,454,345
+2dpi,PM BABA,2055,554,714
+2dpi,PM SA,2981,736,888
+2dpi,PM JA,1950,429,706
