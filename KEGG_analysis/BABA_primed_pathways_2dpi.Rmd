@@ -1545,6 +1545,7 @@ ggsave(filename = "integration/Output_BABA_primed_pathways_2dpi/BABA_primed_path
        p, device = pdf, width = 20, height = 40, limitsize = FALSE)
 ```
 
+### Plot key genes
 
 ```{r}
 metabolite_patterns <- c("checkerboard", "bricks")
