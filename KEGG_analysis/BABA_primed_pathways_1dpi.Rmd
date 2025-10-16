@@ -1579,7 +1579,7 @@ ggsave(filename = "integration/Output_BABA_primed_pathways_1dpi/BABA_primed_path
 
 ```{r}
 metabolite_patterns <- c("hs_vertical", "horizontalsaw", "hs_horizontal", "verticalsaw", 
-                         "checkerboard", "gray100", "none", "bricks")
+                         "checkerboard", "gray100", "none", "fishscales", "bricks")
 
 
 p <- key_genes_all %>%
