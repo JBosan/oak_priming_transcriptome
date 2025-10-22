@@ -13,7 +13,6 @@ knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()) #set workin
 ```{r, message=FALSE}
 library(DESeq2) #for analyzing differential gene expression
 library(tidyverse) #for lots of things
-library(EnhancedVolcano) #for volcano plots
 ```
 
 # LOAD 0DPI DATA
