@@ -1,0 +1,1658 @@
+---
+title: "GO_term_analysis"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()) #set working directory to rproject root
+```
+
+#LOAD PACKAGES
+```{r, message=FALSE, warning=FALSE}
+library('topGO') #for enrichment analysis
+library('ggplot2') #for plotting
+library("viridis") #for colours on graphs
+library("forcats") #for reordering bar graphs in fisher p-value order
+library('WriteXLS') #for saving final output tables as XLS file
+library('data.table') 
+```
+
+#TOPGO INFO
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#note possible tests
+# Tests based on gene counts. This is the most popular family of tests, given that it only requires the presence of a list of interesting genes and nothing more. Tests like Fisher's exact test, Hypegeometric test and binomial test belong to this family. Draghici et al. (2006)
+
+# Tests based on gene scores or gene ranks. It includes Kolmogorov-Smirnov like tests (also known as GSEA), Gentleman's Category, t-test, etc. Ackermann and Strimmer (2009)
+
+# Tests based on gene expression. Tests like Goeman's globaltest or GlobalAncova separates from the others since they work directly on the expression matrix. Goeman and Bühlmann (2007)
+
+#https://www.nature.com/articles/s41477-018-0172-3 = used fisher and weight01 algorithm
+#https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-020-06806-5 = goseq
+#https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1008398#pgen.1008398.s001 = used fisher and weight01 algorithm, gives R script
+#https://onlinelibrary.wiley.com/doi/10.1002/evl3.269 = used fisher and weight algorithm
+```
+
+#GO DATABASE + DATA
+```{r}
+#load GO database
+GO_database <- readMappings(file = "GO_analysis/R_topGO/trinotate_GO_terms.tsv", sep = "\t", IDsep = ",")
+head(GO_database, 1) #view first gene + associated GO terms
+
+#load input .Rdata from Deseq analysis
+load(file = "GO_analysis/R_topGO/Initial_GO_input_data_fc1.RData")
+```
+
+#MOCK 0DPI
+```{r, message=FALSE}
+
+#BABA
+
+#subset sig DEGs for 0dpi
+sig_DEGs_0dpi_mock_BABA_vs_mock_Water <- subset(DEGs_0dpi_BABA, DEGs_0dpi_BABA$padj <= 0.05) 
+
+#extract row names of sig DEGs for each time-point
+names_sig_DEGs_0dpi_mock_BABA_vs_mock_Water <- row.names(sig_DEGs_0dpi_mock_BABA_vs_mock_Water)
+
+#set up vector to store genes of interest for GO analysis
+mock_BABA_0dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+mock_BABA_0dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_sig_DEGs_0dpi_mock_BABA_vs_mock_Water))
+
+#add genes names to factor
+names(mock_BABA_0dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+
+#subset sig DEGs for 0dpi
+sig_DEGs_0dpi_mock_SA_vs_mock_Water <- subset(DEGs_0dpi_SA, DEGs_0dpi_SA$padj <= 0.05) 
+
+#extract row names of sig DEGs for each time-point
+names_sig_DEGs_0dpi_mock_SA_vs_mock_Water <- row.names(sig_DEGs_0dpi_mock_SA_vs_mock_Water)
+
+#set up vector to store genes of interest for GO analysis
+mock_SA_0dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+mock_SA_0dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_sig_DEGs_0dpi_mock_SA_vs_mock_Water))
+
+#add genes names to factor
+names(mock_SA_0dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+
+#subset sig DEGs for 0dpi
+sig_DEGs_0dpi_mock_JA_vs_mock_Water <- subset(DEGs_0dpi_JA, DEGs_0dpi_JA$padj <= 0.05) 
+
+#extract row names of sig DEGs for each time-point
+names_sig_DEGs_0dpi_mock_JA_vs_mock_Water <- row.names(sig_DEGs_0dpi_mock_JA_vs_mock_Water)
+
+#set up vector to store genes of interest for GO analysis
+mock_JA_0dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+mock_JA_0dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_sig_DEGs_0dpi_mock_JA_vs_mock_Water))
+
+#add genes names to factor
+names(mock_JA_0dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------BABA mock 0dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_BABA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = mock_BABA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_BABA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_BABA_mock_0dpi_GO_results <- GenTable(BP_BABA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_BABA_mock_0dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_BABA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = mock_BABA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_BABA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_BABA_mock_0dpi_GO_results <- GenTable(MF_BABA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_BABA_mock_0dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_BABA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = mock_BABA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_BABA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_BABA_mock_0dpi_GO_results <- GenTable(CC_BABA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_BABA_mock_0dpi_GO_results
+```
+##---------SA mock 0dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_SA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = mock_SA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_SA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_SA_mock_0dpi_GO_results <- GenTable(BP_SA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_SA_mock_0dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_SA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = mock_SA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_SA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_SA_mock_0dpi_GO_results <- GenTable(MF_SA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_SA_mock_0dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_SA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = mock_SA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_SA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_SA_mock_0dpi_GO_results <- GenTable(CC_SA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_SA_mock_0dpi_GO_results
+```
+##---------JA mock 0dpi 
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_JA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = mock_JA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_JA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_JA_mock_0dpi_GO_results <- GenTable(BP_JA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                       orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_JA_mock_0dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_JA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = mock_JA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_JA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_JA_mock_0dpi_GO_results <- GenTable(MF_JA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                       orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_JA_mock_0dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_JA_mock_0dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = mock_JA_0dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_JA_mock_0dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_JA_mock_0dpi_GO_results <- GenTable(CC_JA_mock_0dpi_topGOdata, fisher = fisher_test, 
+                                       orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_JA_mock_0dpi_GO_results
+```
+
+#PRIMED 1DPI
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+
+#BABA
+#extract row names of primed DEGs
+names_BABA_primed_all_1dpi <- row.names(BABA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+BABA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data))) #can just use zero dpi raw gene data as row/gene names are the same for all three timepoints
+
+#set genes of interest to 1 and others to 0
+BABA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_BABA_primed_all_1dpi))
+
+#add genes names to factor
+names(BABA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+#extract row names of primed DEGs
+names_SA_primed_all_1dpi <- row.names(SA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+SA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+SA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_SA_primed_all_1dpi))
+
+#add genes names to factor
+names(SA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+#extract row names of primed DEGs
+names_JA_primed_all_1dpi <- row.names(JA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+JA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+JA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_JA_primed_all_1dpi))
+
+#add genes names to factor
+names(JA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------BABA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_BABA_primed_1dpi_GO_results <- GenTable(BP_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_BABA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_BABA_primed_1dpi_GO_results <- GenTable(MF_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_BABA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_BABA_primed_1dpi_GO_results <- GenTable(CC_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_BABA_primed_1dpi_GO_results
+```
+##---------SA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_SA_primed_1dpi_GO_results <- GenTable(BP_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_SA_primed_1dpi_GO_results
+
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_SA_primed_1dpi_GO_results <- GenTable(MF_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_SA_primed_1dpi_GO_results
+
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_SA_primed_1dpi_GO_results <- GenTable(CC_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_SA_primed_1dpi_GO_results
+
+
+```
+##---------JA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_JA_primed_1dpi_GO_results <- GenTable(BP_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_JA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_JA_primed_1dpi_GO_results <- GenTable(MF_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_JA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_JA_primed_1dpi_GO_results <- GenTable(CC_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_JA_primed_1dpi_GO_results
+```
+#UP PRIMED 1DPI
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+
+#BABA
+#extract row names of primed DEGs
+names_UP_BABA_primed_all_1dpi <- row.names(UP_BABA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+UP_BABA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data))) #can just use zero dpi raw gene data as row/gene names are the same for all three timepoints
+
+#set genes of interest to 1 and others to 0
+UP_BABA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_UP_BABA_primed_all_1dpi))
+
+#add genes names to factor
+names(UP_BABA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+#extract row names of primed DEGs
+names_UP_SA_primed_all_1dpi <- row.names(UP_SA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+UP_SA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+UP_SA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_UP_SA_primed_all_1dpi))
+
+#add genes names to factor
+names(UP_SA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+#extract row names of primed DEGs
+names_UP_JA_primed_all_1dpi <- row.names(UP_JA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+UP_JA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+UP_JA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_UP_JA_primed_all_1dpi))
+
+#add genes names to factor
+names(UP_JA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------UP BABA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_UP_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = UP_BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_UP_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_UP_BABA_primed_1dpi_GO_results <- GenTable(BP_UP_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_UP_BABA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_UP_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = UP_BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_UP_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_UP_BABA_primed_1dpi_GO_results <- GenTable(MF_UP_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_UP_BABA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_UP_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = UP_BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_UP_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_UP_BABA_primed_1dpi_GO_results <- GenTable(CC_UP_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_UP_BABA_primed_1dpi_GO_results
+```
+##---------UP SA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_UP_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = UP_SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_UP_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_UP_SA_primed_1dpi_GO_results <- GenTable(BP_UP_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_UP_SA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_UP_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = UP_SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_UP_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_UP_SA_primed_1dpi_GO_results <- GenTable(MF_UP_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_UP_SA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_UP_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = UP_SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_UP_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_UP_SA_primed_1dpi_GO_results <- GenTable(CC_UP_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_UP_SA_primed_1dpi_GO_results
+```
+##---------UP JA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_UP_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = UP_JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_UP_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_UP_JA_primed_1dpi_GO_results <- GenTable(BP_UP_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_UP_JA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_UP_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = UP_JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_UP_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_UP_JA_primed_1dpi_GO_results <- GenTable(MF_UP_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_UP_JA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_UP_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = UP_JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_UP_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_UP_JA_primed_1dpi_GO_results <- GenTable(CC_UP_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_UP_JA_primed_1dpi_GO_results
+```
+#DOWN PRIMED 1DPI
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+
+#BABA
+#extract row names of primed DEGs
+names_DOWN_BABA_primed_all_1dpi <- row.names(DOWN_BABA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+DOWN_BABA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data))) #can just use zero dpi raw gene data as row/gene names are the same for all three timepoints
+
+#set genes of interest to 1 and others to 0
+DOWN_BABA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_DOWN_BABA_primed_all_1dpi))
+
+#add genes names to factor
+names(DOWN_BABA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+#extract row names of primed DEGs
+names_DOWN_SA_primed_all_1dpi <- row.names(DOWN_SA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+DOWN_SA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+DOWN_SA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_DOWN_SA_primed_all_1dpi))
+
+#add genes names to factor
+names(DOWN_SA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+#extract row names of primed DEGs
+names_DOWN_JA_primed_all_1dpi <- row.names(DOWN_JA_primed_all_1dpi)
+
+#set up vector to store genes of interest for GO analysis
+DOWN_JA_primed_1dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+DOWN_JA_primed_1dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_DOWN_JA_primed_all_1dpi))
+
+#add genes names to factor
+names(DOWN_JA_primed_1dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------DOWN BABA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_DOWN_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = DOWN_BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_DOWN_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_DOWN_BABA_primed_1dpi_GO_results <- GenTable(BP_DOWN_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_DOWN_BABA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_DOWN_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = DOWN_BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_DOWN_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_DOWN_BABA_primed_1dpi_GO_results <- GenTable(MF_DOWN_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_DOWN_BABA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_DOWN_BABA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = DOWN_BABA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_DOWN_BABA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_DOWN_BABA_primed_1dpi_GO_results <- GenTable(CC_DOWN_BABA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_DOWN_BABA_primed_1dpi_GO_results
+```
+##---------DOWN SA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_DOWN_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = DOWN_SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_DOWN_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_DOWN_SA_primed_1dpi_GO_results <- GenTable(BP_DOWN_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_DOWN_SA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_DOWN_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = DOWN_SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_DOWN_SA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_DOWN_SA_primed_1dpi_GO_results <- GenTable(MF_DOWN_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_DOWN_SA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_DOWN_SA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = DOWN_SA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_DOWN_SA_primed_1dpi_topGOdata, algorithm = "elim", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_DOWN_SA_primed_1dpi_GO_results <- GenTable(CC_DOWN_SA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_DOWN_SA_primed_1dpi_GO_results
+```
+##---------DOWN JA Primed 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_DOWN_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = DOWN_JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_DOWN_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_DOWN_JA_primed_1dpi_GO_results <- GenTable(BP_DOWN_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_DOWN_JA_primed_1dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_DOWN_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = DOWN_JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_DOWN_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_DOWN_JA_primed_1dpi_GO_results <- GenTable(MF_DOWN_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_DOWN_JA_primed_1dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_DOWN_JA_primed_1dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = DOWN_JA_primed_1dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_DOWN_JA_primed_1dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_DOWN_JA_primed_1dpi_GO_results <- GenTable(CC_DOWN_JA_primed_1dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_DOWN_JA_primed_1dpi_GO_results
+```
+#PRIMED 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+
+#BABA
+#extract row names of primed DEGs
+names_BABA_primed_all_2dpi <- row.names(BABA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+BABA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data))) #can just use zero dpi raw gene data as row/gene names are the same for all three timepoints
+
+#set genes of interest to 1 and others to 0
+BABA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_BABA_primed_all_2dpi))
+
+#add genes names to factor
+names(BABA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+#extract row names of primed DEGs
+names_SA_primed_all_2dpi <- row.names(SA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+SA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+SA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_SA_primed_all_2dpi))
+
+#add genes names to factor
+names(SA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+#extract row names of primed DEGs
+names_JA_primed_all_2dpi <- row.names(JA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+JA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+JA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_JA_primed_all_2dpi))
+
+#add genes names to factor
+names(JA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------BABA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_BABA_primed_2dpi_GO_results <- GenTable(BP_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_BABA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_BABA_primed_2dpi_GO_results <- GenTable(MF_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_BABA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_BABA_primed_2dpi_GO_results <- GenTable(CC_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                           orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_BABA_primed_2dpi_GO_results
+```
+##---------SA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_SA_primed_2dpi_GO_results <- GenTable(BP_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_SA_primed_2dpi_GO_results
+
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_SA_primed_2dpi_GO_results <- GenTable(MF_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_SA_primed_2dpi_GO_results
+
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_SA_primed_2dpi_GO_results <- GenTable(CC_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_SA_primed_2dpi_GO_results
+
+
+```
+##---------JA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_JA_primed_2dpi_GO_results <- GenTable(BP_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_JA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_JA_primed_2dpi_GO_results <- GenTable(MF_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_JA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_JA_primed_2dpi_GO_results <- GenTable(CC_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                         orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_JA_primed_2dpi_GO_results
+
+
+```
+#UP PRIMED 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+
+#BABA
+#extract row names of primed DEGs
+names_UP_BABA_primed_all_2dpi <- row.names(UP_BABA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+UP_BABA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data))) #can just use zero dpi raw gene data as row/gene names are the same for all three timepoints
+
+#set genes of interest to 1 and others to 0
+UP_BABA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_UP_BABA_primed_all_2dpi))
+
+#add genes names to factor
+names(UP_BABA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+#extract row names of primed DEGs
+names_UP_SA_primed_all_2dpi <- row.names(UP_SA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+UP_SA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+UP_SA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_UP_SA_primed_all_2dpi))
+
+#add genes names to factor
+names(UP_SA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+#extract row names of primed DEGs
+names_UP_JA_primed_all_2dpi <- row.names(UP_JA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+UP_JA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+UP_JA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_UP_JA_primed_all_2dpi))
+
+#add genes names to factor
+names(UP_JA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------UP BABA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_UP_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = UP_BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_UP_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_UP_BABA_primed_2dpi_GO_results <- GenTable(BP_UP_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_UP_BABA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_UP_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = UP_BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_UP_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_UP_BABA_primed_2dpi_GO_results <- GenTable(MF_UP_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_UP_BABA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_UP_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = UP_BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_UP_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_UP_BABA_primed_2dpi_GO_results <- GenTable(CC_UP_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_UP_BABA_primed_2dpi_GO_results
+```
+##---------UP SA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_UP_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = UP_SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_UP_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_UP_SA_primed_2dpi_GO_results <- GenTable(BP_UP_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                            orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_UP_SA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_UP_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = UP_SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_UP_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_UP_SA_primed_2dpi_GO_results <- GenTable(MF_UP_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                            orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_UP_SA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_UP_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = UP_SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_UP_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_UP_SA_primed_2dpi_GO_results <- GenTable(CC_UP_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                            orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_UP_SA_primed_2dpi_GO_results
+```
+##---------UP JA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_UP_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = UP_JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_UP_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_UP_JA_primed_2dpi_GO_results <- GenTable(BP_UP_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                            orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_UP_JA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_UP_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = UP_JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_UP_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_UP_JA_primed_2dpi_GO_results <- GenTable(MF_UP_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                            orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_UP_JA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_UP_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = UP_JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_UP_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_UP_JA_primed_2dpi_GO_results <- GenTable(CC_UP_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                            orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_UP_JA_primed_2dpi_GO_results
+```
+#DOWN PRIMED 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+
+#BABA
+#extract row names of primed DEGs
+names_DOWN_BABA_primed_all_2dpi <- row.names(DOWN_BABA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+DOWN_BABA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data))) #can just use zero dpi raw gene data as row/gene names are the same for all three timepoints
+
+#set genes of interest to 1 and others to 0
+DOWN_BABA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_DOWN_BABA_primed_all_2dpi))
+
+#add genes names to factor
+names(DOWN_BABA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#SA
+#extract row names of primed DEGs
+names_DOWN_SA_primed_all_2dpi <- row.names(DOWN_SA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+DOWN_SA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+DOWN_SA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_DOWN_SA_primed_all_2dpi))
+
+#add genes names to factor
+names(DOWN_SA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+
+#JA
+#extract row names of primed DEGs
+names_DOWN_JA_primed_all_2dpi <- row.names(DOWN_JA_primed_all_2dpi)
+
+#set up vector to store genes of interest for GO analysis
+DOWN_JA_primed_2dpi_GO_genes <- vector(length = length(row.names(zero_dpi_raw_gene_data)))
+
+#set genes of interest to 1 and others to 0
+DOWN_JA_primed_2dpi_GO_genes <- factor(as.integer(row.names(zero_dpi_raw_gene_data) %in% names_DOWN_JA_primed_all_2dpi))
+
+#add genes names to factor
+names(DOWN_JA_primed_2dpi_GO_genes) <- row.names(zero_dpi_raw_gene_data)
+```
+
+##---------DOWN BABA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_DOWN_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = DOWN_BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_DOWN_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_DOWN_BABA_primed_2dpi_GO_results <- GenTable(BP_DOWN_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                                orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_DOWN_BABA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_DOWN_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = DOWN_BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_DOWN_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_DOWN_BABA_primed_2dpi_GO_results <- GenTable(MF_DOWN_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                                orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_DOWN_BABA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_DOWN_BABA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = DOWN_BABA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_DOWN_BABA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_DOWN_BABA_primed_2dpi_GO_results <- GenTable(CC_DOWN_BABA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                                orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_DOWN_BABA_primed_2dpi_GO_results
+```
+##---------DOWN SA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_DOWN_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = DOWN_SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_DOWN_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_DOWN_SA_primed_2dpi_GO_results <- GenTable(BP_DOWN_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_DOWN_SA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_DOWN_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = DOWN_SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_DOWN_SA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_DOWN_SA_primed_2dpi_GO_results <- GenTable(MF_DOWN_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_DOWN_SA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_DOWN_SA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = DOWN_SA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_DOWN_SA_primed_2dpi_topGOdata, algorithm = "elim", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_DOWN_SA_primed_2dpi_GO_results <- GenTable(CC_DOWN_SA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_DOWN_SA_primed_2dpi_GO_results
+```
+##---------DOWN JA Primed 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#BP (biological process)
+
+#create topGOdata object to be used for enrichment analysis
+BP_DOWN_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "BP", allGenes = DOWN_JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(BP_DOWN_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+BP_DOWN_JA_primed_2dpi_GO_results <- GenTable(BP_DOWN_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+BP_DOWN_JA_primed_2dpi_GO_results
+
+#MF (molecular function)
+
+#create topGOdata object to be used for enrichment analysis
+MF_DOWN_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "MF", allGenes = DOWN_JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(MF_DOWN_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+MF_DOWN_JA_primed_2dpi_GO_results <- GenTable(MF_DOWN_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+MF_DOWN_JA_primed_2dpi_GO_results
+
+#CC (cellular compartment)
+
+#create topGOdata object to be used for enrichment analysis
+CC_DOWN_JA_primed_2dpi_topGOdata <- new("topGOdata", ontology = "CC", allGenes = DOWN_JA_primed_2dpi_GO_genes, annot = annFUN.gene2GO, gene2GO = GO_database)
+
+#perform enrichment analysis
+fisher_test <- runTest(CC_DOWN_JA_primed_2dpi_topGOdata, algorithm = "weight01", statistic = "fisher") #double check which algorithm and test stat to use??
+fisher_test
+
+#visualise enrichment analysis results (ordered by fisher p-value)
+CC_DOWN_JA_primed_2dpi_GO_results <- GenTable(CC_DOWN_JA_primed_2dpi_topGOdata, fisher = fisher_test, 
+                                              orderBy = "fisher", topNodes = length(score(fisher_test)), numChar=1000)
+CC_DOWN_JA_primed_2dpi_GO_results
+```
+#PLOT GRAPHS FOR ALL RESULTS
+```{r}
+# ---- Function to make one GO plot ----
+make_go_plot <- function(df, label) {
+  
+  ## DATA PREP ##
+  #convert fisher p-value to numeric to be used as continous scale and allow subsetting
+  df$fisher <- as.numeric(df$fisher)
+  #convert significant gene hits to numeric to allow subsetting
+  df$Significant <- as.numeric(df$Significant)
+  #select terms with at least 10 gene hits
+  df_10_gene_hits <- subset(df, df$Significant >=10)
+  #select top 10 most sig gene hits
+  df_most_sig <- df_10_gene_hits[1:10,] #note results are already ordered by p-val
+  #filter to only genes with a fisher p ≤ 0.05
+  df_plot <- subset(df_most_sig, df_most_sig$fisher <= 0.05)
+  #check if df_plot has entries, NULL if not
+  if (nrow(df_plot) == 0) return(NULL)
+  
+  ## LIMITS FUNCTIONS ##
+  # Helper: round up to next multiple of 20
+  next20 <- function(x) ceiling(x / 20) * 20
+  #ensure max for limits round to next 20 flexibly in each plot
+  y_upper <- next20(max(df_plot$Significant, na.rm = TRUE))
+  # Helper: if number of sig_genes above 400, ticks every 40 to remove cluter
+  y_break <- ifelse(y_upper >= 300, 40, 20)
+  
+  ## Graph ##
+  ggplot(df_plot, aes(x = fct_reorder(Term, fisher), y = Significant, fill = fisher)) +
+    geom_col() +
+    xlab(paste(label, "GO Term")) +
+    ylab("Number of Significant Genes") +
+    guides(fill = guide_colorbar(title = "Fisher P-value")) +
+    scale_y_continuous(
+      limits = c(0, y_upper),
+      breaks = seq(0, y_upper, by = y_break)
+    ) +
+    coord_flip() +
+    scale_fill_viridis(labels = function(x) format(x, scientific = TRUE, digits = 2)) + #+ force scientific notation
+    theme(legend.position = "bottom", #place legend at bottom
+          legend.direction = "horizontal", #make legend horizontal
+          legend.key.width = unit(1.5, "cm"),     # wider legend colorbar
+          legend.key.height = unit(0.4, "cm"),    # keep legend slim,
+          plot.margin = margin(b = 10, t = 10, l = 10, r = 60), #adjust to ensure legend fits
+          panel.grid.major = element_blank(), #remove major grid lines
+          panel.grid.minor = element_blank(), #remove minor grid lines
+          panel.background = element_rect(fill = "#f5f5f5"), #light grey background to match other graphs
+          axis.line = element_line()) #add lines to axis
+}
+
+# ---- Loop over all result sets ----
+
+# Get all *_GO_results objects currently in memory
+all_results <- ls(pattern = "^(BP|MF|CC)_.*_GO_results$")
+
+# Identify unique experiment names (e.g. "BABA_mock_0dpi", "BABA_primed_1dpi", etc.)
+experiment_names <- unique(gsub("^(BP|MF|CC)_", "", gsub("_GO_results$", "", all_results)))
+
+for (exp_name in experiment_names) {
+  
+  plots <- list()
+  
+  for (ont in c("BP", "MF", "CC")) {
+    obj_name <- paste0(ont, "_", exp_name, "_GO_results")
+    if (!exists(obj_name)) next
+    
+    df <- get(obj_name)
+    plot <- make_go_plot(df, ont)
+    
+    if (!is.null(plot)) {
+      plots[[ont]] <- plot
+      
+      # save subclass plots i.e. BP, MF, CC
+      subclass_file <- file.path(paste0("GO_analysis/R_topGO/", ont, "_graphs"), 
+                                 paste0(ont, "_", exp_name, "_GO_terms.pdf"))
+      ggsave(subclass_file, plot = plot, width = 8, height = 6, dpi = 300)
+    }
+  }
+  
+  # Merge BP, MF, CC (if available)
+  available_plots <- plots[!sapply(plots, is.null)]
+  if (length(available_plots) > 0) {
+    merged <- cowplot::plot_grid(plotlist = available_plots, ncol = 1, align = "hv", axis = "rblt")
+    merged_file <- file.path("GO_analysis/R_topGO/full_graphs", paste0(exp_name, "_GO_terms.pdf"))
+    ggsave(merged_file, plot = merged, width = 12, height = 18, dpi = 300)
+  }
+}
+```
+
+#SUMMARY TABLES
+
+##--------All primed GOs 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#In each case have selected terms with at least 10 sig hits and then selected top 10 most significant terms for brevity
+
+#BABA all GOs
+Summary_BABA_all_1dpi <- 
+  rbind(subset(BP_BABA_primed_1dpi_GO_results, BP_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_BABA_primed_1dpi_GO_results, MF_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_BABA_primed_1dpi_GO_results, CC_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_BABA_all_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_BABA_all_1dpi) <- c("BABA.Term", "BABA.Significant", "BABA.fisher", "BABA.ontology") #rename cols to make final table clearer
+
+#SA all GOs
+
+Summary_SA_all_1dpi <- 
+  rbind(subset(BP_SA_primed_1dpi_GO_results, BP_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_SA_primed_1dpi_GO_results, MF_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_SA_primed_1dpi_GO_results, CC_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_SA_all_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_SA_all_1dpi) <- c("SA.Term", "SA.Significant", "SA.fisher", "SA.ontology") #rename cols to make final table clearer
+
+#JA all GOs
+
+Summary_JA_all_1dpi <- 
+  rbind(subset(BP_JA_primed_1dpi_GO_results, BP_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_JA_primed_1dpi_GO_results, MF_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_JA_primed_1dpi_GO_results, CC_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_JA_all_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_JA_all_1dpi) <- c("JA.Term", "JA.Significant", "JA.fisher", "JA.ontology") #rename cols to make final table clearer
+
+#Merge tables for all treatments
+Summary_all_1dpi <- as.data.table(append(Summary_BABA_all_1dpi, Summary_SA_all_1dpi))
+
+Summary_all_1dpi <- as.data.table(append(Summary_all_1dpi, Summary_JA_all_1dpi))
+
+#Save final table
+WriteXLS(Summary_all_1dpi, "GO_analysis/R_topGO/Summary_all_primed_GOs_1dpi.xls")
+```
+
+##--------Upregulated primed GOs 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#In each case have selected terms with at least 10 sig hits and then selected top 10 most significant terms for brevity
+
+#BABA UP GOs
+Summary_BABA_UP_1dpi <- 
+  rbind(subset(BP_UP_BABA_primed_1dpi_GO_results, BP_UP_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_UP_BABA_primed_1dpi_GO_results, MF_UP_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_UP_BABA_primed_1dpi_GO_results, CC_UP_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_BABA_UP_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_BABA_UP_1dpi) <- c("BABA.Term", "BABA.Significant", "BABA.fisher", "BABA.ontology") #rename cols to make final table clearer
+
+#SA UP GOs
+
+Summary_SA_UP_1dpi <- 
+  rbind(subset(BP_UP_SA_primed_1dpi_GO_results, BP_UP_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_UP_SA_primed_1dpi_GO_results, MF_UP_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_UP_SA_primed_1dpi_GO_results, CC_UP_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_SA_UP_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_SA_UP_1dpi) <- c("SA.Term", "SA.Significant", "SA.fisher", "SA.ontology") #rename cols to make final table clearer
+
+#JA UP GOs
+
+Summary_JA_UP_1dpi <- 
+  rbind(subset(BP_UP_JA_primed_1dpi_GO_results, BP_UP_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_UP_JA_primed_1dpi_GO_results, MF_UP_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_UP_JA_primed_1dpi_GO_results, CC_UP_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_JA_UP_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_JA_UP_1dpi) <- c("JA.Term", "JA.Significant", "JA.fisher", "JA.ontology") #rename cols to make final table clearer
+
+#Merge tables for UP treatments
+Summary_UP_1dpi <- as.data.table(append(Summary_BABA_UP_1dpi, Summary_SA_UP_1dpi))
+
+Summary_UP_1dpi <- as.data.table(append(Summary_UP_1dpi, Summary_JA_UP_1dpi))
+
+#Save final table
+WriteXLS(Summary_UP_1dpi, "GO_analysis/R_topGO/Summary_UP_primed_GOs_1dpi.xls")
+```
+
+##--------Downregulated primed GOs 1dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#In each case have selected terms with at least 10 sig hits and then selected top 10 most significant terms for brevity
+
+#BABA DOWN GOs
+Summary_BABA_DOWN_1dpi <- 
+  rbind(subset(BP_DOWN_BABA_primed_1dpi_GO_results, BP_DOWN_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_DOWN_BABA_primed_1dpi_GO_results, MF_DOWN_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_DOWN_BABA_primed_1dpi_GO_results, CC_DOWN_BABA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_BABA_DOWN_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_BABA_DOWN_1dpi) <- c("BABA.Term", "BABA.Significant", "BABA.fisher", "BABA.ontology") #rename cols to make final table clearer
+
+#SA DOWN GOs
+
+Summary_SA_DOWN_1dpi <- 
+  rbind(subset(BP_DOWN_SA_primed_1dpi_GO_results, BP_DOWN_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_DOWN_SA_primed_1dpi_GO_results, MF_DOWN_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_DOWN_SA_primed_1dpi_GO_results, CC_DOWN_SA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_SA_DOWN_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_SA_DOWN_1dpi) <- c("SA.Term", "SA.Significant", "SA.fisher", "SA.ontology") #rename cols to make final table clearer
+
+#JA DOWN GOs
+
+Summary_JA_DOWN_1dpi <- 
+  rbind(subset(BP_DOWN_JA_primed_1dpi_GO_results, BP_DOWN_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_DOWN_JA_primed_1dpi_GO_results, MF_DOWN_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_DOWN_JA_primed_1dpi_GO_results, CC_DOWN_JA_primed_1dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_JA_DOWN_1dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_JA_DOWN_1dpi) <- c("JA.Term", "JA.Significant", "JA.fisher", "JA.ontology") #rename cols to make final table clearer
+
+#Merge tables for DOWN treatments
+Summary_DOWN_1dpi <- as.data.table(append(Summary_BABA_DOWN_1dpi, Summary_SA_DOWN_1dpi))
+
+Summary_DOWN_1dpi <- as.data.table(append(Summary_DOWN_1dpi, Summary_JA_DOWN_1dpi))
+
+#Save final table
+WriteXLS(Summary_DOWN_1dpi, "GO_analysis/R_topGO/Summary_DOWN_primed_GOs_1dpi.xls")
+```
+
+##--------All primed GOs 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#In each case have selected terms with at least 10 sig hits and then selected top 10 most significant terms for brevity
+
+#BABA all GOs
+Summary_BABA_all_2dpi <- 
+  rbind(subset(BP_BABA_primed_2dpi_GO_results, BP_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_BABA_primed_2dpi_GO_results, MF_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_BABA_primed_2dpi_GO_results, CC_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_BABA_all_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_BABA_all_2dpi) <- c("BABA.Term", "BABA.Significant", "BABA.fisher", "BABA.ontology") #rename cols to make final table clearer
+
+#SA all GOs
+
+Summary_SA_all_2dpi <- 
+  rbind(subset(BP_SA_primed_2dpi_GO_results, BP_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_SA_primed_2dpi_GO_results, MF_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_SA_primed_2dpi_GO_results, CC_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_SA_all_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_SA_all_2dpi) <- c("SA.Term", "SA.Significant", "SA.fisher", "SA.ontology") #rename cols to make final table clearer
+
+#JA all GOs
+
+Summary_JA_all_2dpi <- 
+  rbind(subset(BP_JA_primed_2dpi_GO_results, BP_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_JA_primed_2dpi_GO_results, MF_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_JA_primed_2dpi_GO_results, CC_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_JA_all_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_JA_all_2dpi) <- c("JA.Term", "JA.Significant", "JA.fisher", "JA.ontology") #rename cols to make final table clearer
+
+#Merge tables for all treatments
+Summary_all_2dpi <- as.data.table(append(Summary_BABA_all_2dpi, Summary_SA_all_2dpi))
+
+Summary_all_2dpi <- as.data.table(append(Summary_all_2dpi, Summary_JA_all_2dpi))
+
+#Save final table
+WriteXLS(Summary_all_2dpi, "GO_analysis/R_topGO/Summary_all_primed_GOs_2dpi.xls")
+```
+
+##--------Upregulated primed GOs 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#In each case have selected terms with at least 10 sig hits and then selected top 10 most significant terms for brevity
+
+#BABA UP GOs
+Summary_BABA_UP_2dpi <- 
+  rbind(subset(BP_UP_BABA_primed_2dpi_GO_results, BP_UP_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_UP_BABA_primed_2dpi_GO_results, MF_UP_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_UP_BABA_primed_2dpi_GO_results, CC_UP_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_BABA_UP_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_BABA_UP_2dpi) <- c("BABA.Term", "BABA.Significant", "BABA.fisher", "BABA.ontology") #rename cols to make final table clearer
+
+#SA UP GOs
+
+Summary_SA_UP_2dpi <- 
+  rbind(subset(BP_UP_SA_primed_2dpi_GO_results, BP_UP_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_UP_SA_primed_2dpi_GO_results, MF_UP_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_UP_SA_primed_2dpi_GO_results, CC_UP_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_SA_UP_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_SA_UP_2dpi) <- c("SA.Term", "SA.Significant", "SA.fisher", "SA.ontology") #rename cols to make final table clearer
+
+#JA UP GOs
+
+Summary_JA_UP_2dpi <- 
+  rbind(subset(BP_UP_JA_primed_2dpi_GO_results, BP_UP_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_UP_JA_primed_2dpi_GO_results, MF_UP_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_UP_JA_primed_2dpi_GO_results, CC_UP_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_JA_UP_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_JA_UP_2dpi) <- c("JA.Term", "JA.Significant", "JA.fisher", "JA.ontology") #rename cols to make final table clearer
+
+#Merge tables for UP treatments
+Summary_UP_2dpi <- as.data.table(append(Summary_BABA_UP_2dpi, Summary_SA_UP_2dpi))
+
+Summary_UP_2dpi <- as.data.table(append(Summary_UP_2dpi, Summary_JA_UP_2dpi))
+
+#Save final table
+WriteXLS(Summary_UP_2dpi, "GO_analysis/R_topGO/Summary_UP_primed_GOs_2dpi.xls")
+```
+
+##--------Downregulated primed GOs 2dpi
+```{r, echo = T, results = 'hide', message = FALSE, fig.show = 'hide'}
+#In each case have selected terms with at least 10 sig hits and then selected top 10 most significant terms for brevity
+
+#BABA DOWN GOs
+Summary_BABA_DOWN_2dpi <- 
+  rbind(subset(BP_DOWN_BABA_primed_2dpi_GO_results, BP_DOWN_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_DOWN_BABA_primed_2dpi_GO_results, MF_DOWN_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_DOWN_BABA_primed_2dpi_GO_results, CC_DOWN_BABA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_BABA_DOWN_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_BABA_DOWN_2dpi) <- c("BABA.Term", "BABA.Significant", "BABA.fisher", "BABA.ontology") #rename cols to make final table clearer
+
+#SA DOWN GOs
+
+Summary_SA_DOWN_2dpi <- 
+  rbind(subset(BP_DOWN_SA_primed_2dpi_GO_results, BP_DOWN_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_DOWN_SA_primed_2dpi_GO_results, MF_DOWN_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_DOWN_SA_primed_2dpi_GO_results, CC_DOWN_SA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_SA_DOWN_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_SA_DOWN_2dpi) <- c("SA.Term", "SA.Significant", "SA.fisher", "SA.ontology") #rename cols to make final table clearer
+
+#JA DOWN GOs
+
+Summary_JA_DOWN_2dpi <- 
+  rbind(subset(BP_DOWN_JA_primed_2dpi_GO_results, BP_DOWN_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #BP terms
+        subset(MF_DOWN_JA_primed_2dpi_GO_results, MF_DOWN_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")], #MF terms
+        subset(CC_DOWN_JA_primed_2dpi_GO_results, CC_DOWN_JA_primed_2dpi_GO_results$Significant >= 10)[1:10, c("Term", "Significant", "fisher")]) #CC terms
+
+Summary_JA_DOWN_2dpi$Ontology <- c(rep("BP", times = 10), rep("MF", times = 10), rep("CC", times = 10)) #add ontology type column
+
+colnames(Summary_JA_DOWN_2dpi) <- c("JA.Term", "JA.Significant", "JA.fisher", "JA.ontology") #rename cols to make final table clearer
+
+#Merge tables for DOWN treatments
+Summary_DOWN_2dpi <- as.data.table(append(Summary_BABA_DOWN_2dpi, Summary_SA_DOWN_2dpi))
+
+Summary_DOWN_2dpi <- as.data.table(append(Summary_DOWN_2dpi, Summary_JA_DOWN_2dpi))
+
+#Save final table
+WriteXLS(Summary_DOWN_2dpi, "GO_analysis/R_topGO/Summary_DOWN_primed_GOs_2dpi.xls")
+```
+
+Note the summary tables were filtered by p-value in excel when producing final tables
