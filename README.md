@@ -31,7 +31,7 @@ Code for volcano plots used to determine optimal fold-change threshold for selec
 [Data](https://github.com/JBosan/oak_priming_transcriptome/blob/main/primed_gene_venns/priming_selection_venns.RData) and [code](https://github.com/JBosan/oak_priming_transcriptome/blob/main/primed_gene_venns/priming_selection_venns.Rmd) used to generate venn diagrams comparing genes primed by each elicitor.
 
 #### [trinotate.pptx](https://github.com/JBosan/oak_priming_transcriptome/blob/main/trinotate.pptx)
-Overview and explanation of code used for GO annotation [oak reference genome](https://www.oakgenome.fr/index.html) using [trinotate v4.0.2](https://github.com/Trinotate/Trinotate/wiki)
+Overview and explanation of code used for GO annotation of [oak reference genome](https://www.oakgenome.fr/index.html) using [trinotate v4.0.2](https://github.com/Trinotate/Trinotate/wiki)
 
 #### GO_enrichment
 [Data](https://github.com/JBosan/oak_priming_transcriptome/tree/main/GO_enrichment), [code](https://github.com/JBosan/oak_priming_transcriptome/blob/main/GO_enrichment/GO_enrichment_analysis.Rmd), and output [graphs](https://github.com/JBosan/oak_priming_transcriptome/tree/main/GO_enrichment/GO_graphs) and [summary tables](https://github.com/JBosan/oak_priming_transcriptome/tree/main/GO_enrichment/GO_summary_tables) for GO enrichment analysis
